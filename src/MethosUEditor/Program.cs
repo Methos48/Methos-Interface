@@ -203,7 +203,7 @@ internal sealed class MainForm : Form
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
-        int ok = 0, failed = 0;
+        int ok = 0, failed = 0, repairedFunctions = 0, insertedClosures = 0;
         foreach (var obj in classes)
         {
             try
@@ -211,12 +211,34 @@ internal sealed class MainForm : Form
                 var source = obj.Decompile();
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+
+                // UELib can stop formatting nested scopes after a malformed bytecode token.
+                // Repair only missing closing braces at the next function boundary, and report every change.
+                try
+                {
+                    var repair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source);
+                    if (repair.Repairs.Count > 0)
+                    {
+                        source = repair.Source;
+                        repairedFunctions += repair.Repairs.Count;
+                        foreach (var item in repair.Repairs)
+                        {
+                            insertedClosures += item.ClosuresInserted;
+                            Log($"Fuente reparada: {safeName}.{item.FunctionName} (línea {item.Line}); se insertaron {item.ClosuresInserted} llaves de cierre.");
+                        }
+                    }
+                }
+                catch (Exception repairError)
+                {
+                    Log($"Aviso: no se pudo verificar/reparar la estructura de {safeName}.uc; se conserva la salida original. {repairError.Message}");
+                }
+
                 SaveTextWithBackup(Path.Combine(output, safeName + ".uc"), source);
                 ok++;
             }
             catch (Exception ex) { failed++; Log($"No se pudo exportar una clase: {ex.Message}"); }
         }
-        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}. Carpeta: {output}");
+        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
     });
 
