@@ -1,0 +1,50 @@
+name: Validar compilador UCC de Interlude
+
+on:
+  push:
+    paths:
+      - "Compilador  U.zip"
+      - ".github/workflows/validate-ucc-compiler.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ucc:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio sin credenciales persistentes
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Extraer el kit UCC de Interlude
+        shell: pwsh
+        run: |
+          $archive = Join-Path $PWD "Compilador  U.zip"
+          if (!(Test-Path -LiteralPath $archive)) { throw "No se encontró Compilador  U.zip." }
+          $root = Join-Path $PWD "ucc-validation"
+          Expand-Archive -LiteralPath $archive -DestinationPath $root -Force
+          $kit = Join-Path $root "Compilador  U"
+          if (!(Test-Path (Join-Path $kit "Interlude\System\ucc.exe"))) { throw "El ZIP no contiene UCC.exe." }
+          "KIT=$kit" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Compilar todas las clases .uc con UCC
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:KIT "Compilar.ps1"
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script
+          if ($LASTEXITCODE -ne 0) { throw "UCC no pudo compilar las fuentes .uc." }
+          $output = Join-Path $env:KIT "Testar\system\Interface.u"
+          if (!(Test-Path -LiteralPath $output)) { throw "UCC no generó Testar\system\Interface.u." }
+          $file = Get-Item -LiteralPath $output
+          if ($file.Length -lt 65536) { throw "El Interface.u generado es demasiado pequeño para considerarse válido." }
+          Write-Host "UCC compiló Interface.u: $($file.Length) bytes."
+
+      - name: Validar estructura del paquete compilado
+        shell: pwsh
+        run: |
+          $validator = Join-Path $env:KIT "ValidatePackage.ps1"
+          $output = Join-Path $env:KIT "Testar\system\Interface.u"
+          & $validator -PackagePath $output
