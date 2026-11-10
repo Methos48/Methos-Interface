@@ -219,12 +219,17 @@ internal sealed class MainForm : Form
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
                 var repaired = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source);
-                if (repaired.Repairs.Count > 0)
+                if (repaired.Repairs.Count > 0 || repaired.StringEscapesRepaired > 0)
                 {
                     var originals = Path.Combine(output, "originales");
                     Directory.CreateDirectory(originals);
                     SaveTextWithBackup(Path.Combine(originals, safeName + ".uc"), source);
                     repairedClasses++;
+                    if (repaired.StringEscapesRepaired > 0)
+                    {
+                        repairReport.Add($"{safeName}.uc | cadenas con barra invertida final corregidas: {repaired.StringEscapesRepaired}");
+                        Log($"Reconstrucción de {safeName}.uc: cadenas con barra invertida final corregidas={repaired.StringEscapesRepaired}.");
+                    }
                     foreach (var item in repaired.Repairs)
                     {
                         insertedClosures += item.ClosuresInserted;
