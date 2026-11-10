@@ -13,14 +13,14 @@ static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
 {
     foreach (var field in owner.EnumerateFields())
     {
-        if (field is UFunction function)
+        if (field is UFunction nestedFunction)
         {
-            yield return function;
+            yield return nestedFunction;
             continue;
         }
         if (field is UStruct nested)
-            foreach (var function in EnumerateClassFunctions(nested))
-                yield return function;
+            foreach (var childFunction in EnumerateClassFunctions(nested))
+                yield return childFunction;
     }
 }
 
