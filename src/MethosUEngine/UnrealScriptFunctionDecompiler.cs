@@ -69,7 +69,7 @@ public static class UnrealScriptFunctionDecompiler
             else if (token == EX_Let)
             {
                 string left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
-                string right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                string right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
                 statements.Add($"{left} = {right};");
             }
             else
