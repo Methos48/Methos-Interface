@@ -152,7 +152,7 @@ public static class UnrealScriptFunctionDecompiler
     {
         if (value.Contains('\r') || value.Contains('\n'))
             throw new NotSupportedException("Cadena con saltos de línea no admitida en este subconjunto.");
-        return "\"" + value.Replace("\\\\", "\\\\\\\\").Replace("\\\"", "\\\\\"") + "\"";
+        return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
     }
 
     private static byte ReadByte(byte[] data, ref int position)
