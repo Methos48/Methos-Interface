@@ -30,13 +30,16 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          if (!(Test-Path "\${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "No se encontró Inno Setup." }
+          $iscc = @("C:\Program Files (x86)\Inno Setup 6\ISCC.exe", "C:\Program Files\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$iscc) { $cmd = Get-Command ISCC.exe -ErrorAction SilentlyContinue; if ($cmd) { $iscc = $cmd.Source } }
+          if (!$iscc) { throw "No se encontró Inno Setup." }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Crear instalador
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
-          & "\${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\Methos-U-Editor.iss
+          & $env:ISCC installer\Methos-U-Editor.iss
           if ($LASTEXITCODE -ne 0) { throw "Falló Inno Setup." }
 
       - name: Publicar ejecutable e instalador
