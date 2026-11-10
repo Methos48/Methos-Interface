@@ -487,8 +487,7 @@ internal sealed class MainForm : Form
             else throw new DirectoryNotFoundException($"No existe la carpeta de fuentes: {sourceDirectory}");
         }
 
-        var ucFiles = Directory.GetFiles(sourceDirectory, "*.uc", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+        var ucFiles = GetSourceFiles(sourceDirectory);
         if (ucFiles.Length == 0)
             throw new InvalidOperationException($"No se encontraron archivos .uc en {sourceDirectory}");
 
@@ -497,7 +496,39 @@ internal sealed class MainForm : Form
         if (duplicateNames.Length > 0)
             throw new InvalidOperationException("Hay nombres de clase .uc duplicados: " + string.Join(", ", duplicateNames));
 
-        Log($"Motor nativo Methos: preparando {ucFiles.Length} fuentes .uc. No se ejecutará UCC.exe.");
+        if (baseName.Equals("Interface", StringComparison.OrdinalIgnoreCase) &&
+            UccCompiler.IsAvailable(UccRuntimeRoot))
+        {
+            Log($"Compilador UCC Interlude detectado. Compilando {ucFiles.Length} fuentes .uc con el backend completo.");
+            UccCompileResult uccResult = UccCompiler.CompileInterface(UccRuntimeRoot, sourceDirectory);
+            string uccTemporaryOutput = Path.Combine(Path.GetTempPath(), "MethosU_UCC_" + Guid.NewGuid().ToString("N") + ".u");
+            try
+            {
+                File.WriteAllBytes(uccTemporaryOutput, uccResult.PackageBytes);
+                var verifiedUcc = UnrealPackageIndex.Open(uccTemporaryOutput);
+                using (var validation = UnrealLoader.LoadPackage(uccTemporaryOutput, FileAccess.Read))
+                {
+                    validation.InitializePackage();
+                    int classCount = validation.Objects.OfType<UClass>().Count(item => (int)item > 0);
+                    if (classCount < 100)
+                        throw new InvalidDataException($"UCC generó un Interface.u con solo {classCount} clases reconocibles.");
+                    Log($"Validación UCC: {classCount} clases; names={verifiedUcc.Names.Count}; imports={verifiedUcc.Imports.Count}; exports={verifiedUcc.Exports.Count}.");
+                }
+
+                var destination = Path.Combine(CompleteDir, baseName + ".u");
+                CopyWithBackup(uccTemporaryOutput, destination);
+                SaveSourceSnapshot(baseName, uccResult.PackageBytes, sourceDirectory);
+                Log($"Compilación UCC terminada: {ucFiles.Length} fuentes; {uccResult.PackageBytes.Length:N0} bytes; perfil={uccResult.ProfileDescription}; archivo={destination}");
+            }
+            finally
+            {
+                if (File.Exists(uccTemporaryOutput)) File.Delete(uccTemporaryOutput);
+            }
+            return;
+        }
+
+        Log($"Runtime UCC no disponible para {baseName}. Se utilizará el motor nativo Methos (compatibilidad limitada).");
+        Log($"Motor nativo Methos: preparando {ucFiles.Length} fuentes .uc.");
         byte[] packageBytes = File.ReadAllBytes(packagePath);
         var nativePackage = UnrealPackageIndex.Parse(packageBytes);
 
@@ -589,6 +620,7 @@ internal sealed class MainForm : Form
 
             var destination = Path.Combine(CompleteDir, baseName + ".u");
             CopyWithBackup(temporaryOutput, destination);
+            SaveSourceSnapshot(baseName, packageBytes, sourceDirectory);
             Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}. Archivo: {destination}");
         }
         finally
