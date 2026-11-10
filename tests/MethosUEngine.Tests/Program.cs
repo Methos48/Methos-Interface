@@ -212,6 +212,8 @@ Assert(parsed.Summary.Version == 126 && parsed.Summary.LicenseeVersion == 0, "Ve
 Assert(parsed.Summary.ProfileDescription.Contains("UE2 v126/0", StringComparison.Ordinal),
     "Unknown v126/0 profile was incorrectly classified as Lineage II.");
 Assert(parsed.Names.SequenceEqual(new[] { "None", "TestClass" }), "Name table mismatch.");
+Assert(parsed.ResolveObjectName(0) == "None" && parsed.ResolveObjectName(1) == "TestClass",
+    "Native object-reference name resolution failed.");
 Assert(parsed.Exports.Count == 1 && parsed.Exports[0].SerialOffset == 64, "Export table mismatch.");
 
 byte[] rebuilt = parsed.CreateLosslessRoundTrip();
@@ -345,6 +347,9 @@ Assert(expandedPackage.Summary.ExportCount == 2, "New export was not appended.")
 Assert(expandedPackage.Names[2] == "界面", "UTF-16 name was not preserved.");
 var added = expandedPackage.Exports[1];
 Assert(added.ClassRef == -1 && added.SerialSize == 5, "New export metadata is incorrect.");
+Assert(expandedPackage.ResolveObjectName(-1) == "Object" &&
+    expandedPackage.ResolveObjectName(2) == "界面",
+    "Native import/export object-name resolution failed.");
 Assert(expanded.AsSpan(added.SerialOffset, added.SerialSize).SequenceEqual(
     new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55 }), "New export payload is incorrect.");
 Assert(expanded.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }),
