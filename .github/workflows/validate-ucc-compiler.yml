@@ -37,7 +37,7 @@ jobs:
         run: |
           $embedded = Join-Path $env:KIT "Testar\system\Interface.u"
           $repositoryPackage = Join-Path $PWD "Interface.u"
-          if (Test-Path -LiteralPath $embedded -and Test-Path -LiteralPath $repositoryPackage) {
+          if ((Test-Path -LiteralPath $embedded) -and (Test-Path -LiteralPath $repositoryPackage)) {
             $embeddedHash = (Get-FileHash -LiteralPath $embedded -Algorithm SHA256).Hash
             $repositoryHash = (Get-FileHash -LiteralPath $repositoryPackage -Algorithm SHA256).Hash
             Write-Host "KIT_INTERFACE_SIZE=$((Get-Item $embedded).Length)"
