@@ -83,6 +83,20 @@ jobs:
           Write-Host "ORIGINAL_INTERFACE_SHA256=$originalHash"
           Write-Host "UCC_REBUILD_EXACT_MATCH=$($generatedHash -eq $originalHash)"
 
+      - name: Probar el backend UCC integrado en Methos U Engine
+        shell: pwsh
+        run: |
+          $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
+          $output = Join-Path $env:KIT "Testar\system\Interface-csharp.u"
+          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --ucc-compile $env:KIT $sourceDir $output
+          if ($LASTEXITCODE -ne 0) { throw "El backend UCC integrado en Methos U no pudo compilar." }
+          & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
+          $generatedHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash
+          $originalHash = (Get-FileHash -LiteralPath (Join-Path $PWD "Interface.u") -Algorithm SHA256).Hash
+          Write-Host "METHOS_UCC_SHA256=$generatedHash"
+          Write-Host "ORIGINAL_INTERFACE_SHA256=$originalHash"
+          Write-Host "METHOS_UCC_EXACT_MATCH=$($generatedHash -eq $originalHash)"
+
       - name: Descompilar el Interface.u real para probar el recorrido completo
         shell: pwsh
         run: |
