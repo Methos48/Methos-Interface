@@ -163,7 +163,7 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             totalNormalized += restoredSymbolicAssignments;
             if (Path.GetFileName(sourcePath).Equals("UICommonAPI.uc", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"UICommonAPI RESTORATION COUNTS: enum={restoredEnumArguments}; callsite={restoredCallsiteArguments}; failed-functions={repairedFunctions.Count}.");
+                Console.WriteLine($"UICommonAPI RESTORATION COUNTS: enum={restoredEnumArguments}; callsite={restoredCallsiteArguments}; assignments={restoredSymbolicAssignments}; failed-functions={repairedFunctions.Count}.");
                 foreach (string line in normalized.Split('\n')
                     .Where(line => line.Contains("PlayConsoleSound", StringComparison.OrdinalIgnoreCase)))
                     Console.WriteLine("UICommonAPI SOUND CALL: " + line.Trim());
@@ -463,6 +463,31 @@ Assert(restoredSoundCount == 2 &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal),
     "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
+
+string decompiledAssignmentSource = """
+class AssignmentTest;
+function Test() {
+    local DrawItemInfo Info;
+    Info.eType = 1;
+    Info.t_bDrawOneLine = true;
+    ToolTip.DrawList.Length = 1;
+}
+""";
+string referenceAssignmentSource = """
+class AssignmentTest;
+function Test() {
+    local DrawItemInfo Info;
+    Info.eType = DIT_TEXT;
+    Info.t_bDrawOneLine = true;
+    ToolTip.DrawList.Length = 1;
+}
+""";
+string restoredAssignmentSource = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+    decompiledAssignmentSource, referenceAssignmentSource, out int restoredAssignmentCount);
+Assert(restoredAssignmentCount == 1 &&
+       restoredAssignmentSource.Contains("Info.eType = DIT_TEXT;", StringComparison.Ordinal) &&
+       restoredAssignmentSource.Contains("ToolTip.DrawList.Length = 1;", StringComparison.Ordinal),
+    "Numeric enum property assignment was not restored from the matching reference function.");
 
 string brokenFunctionSource = """
 class RepairTest;
