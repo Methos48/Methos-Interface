@@ -404,6 +404,28 @@ string restoredEnumCall = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
     decompiledEnumCall, referenceEnumCall, out int restoredEnumCount);
 Assert(restoredEnumCount == 1 && restoredEnumCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal),
     "A decompiled numeric enum argument was not restored from the reference source.");
+string brokenFunctionSource = """
+class RepairTest;
+function int HealthyFunction() { return 7; }
+function int BrokenFunction() {
+    // Failed to format nests!:System.ArgumentOutOfRangeException
+    return 0;
+}
+""";
+string referenceFunctionSource = """
+class RepairTest;
+function int HealthyFunction() { return 7; }
+function int BrokenFunction() {
+    return 42;
+}
+""";
+string repairedFunctionSource = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
+    brokenFunctionSource, referenceFunctionSource, out var repairedFunctionNames);
+Assert(repairedFunctionNames.Count == 1 &&
+       repairedFunctionNames[0] == "BrokenFunction" &&
+       repairedFunctionSource.Contains("function int BrokenFunction() {\n    return 42;", StringComparison.Ordinal) &&
+       repairedFunctionSource.Contains("return 7;", StringComparison.Ordinal),
+    "The failed-function repair did not restore only the broken function.");
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
