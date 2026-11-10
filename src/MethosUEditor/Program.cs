@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
@@ -296,11 +297,21 @@ internal sealed class MainForm : Form
             {
                 if (function.ExportTable == null)
                     throw new InvalidDataException($"La función '{className}.{function.Name}' no tiene una entrada export válida.");
+                int exportReference = (int)function;
+                if (exportReference < 1 || exportReference > nativePackage.Exports.Count)
+                    throw new InvalidDataException($"La referencia de export de '{className}.{function.Name}' no es válida.");
+                var exportEntry = nativePackage.Exports[exportReference - 1];
                 long relativeOffset = function.ScriptOffset - function.ExportTable.SerialOffset;
-                if (relativeOffset < 4 || relativeOffset > int.MaxValue || function.ScriptSize < 0)
+                if (relativeOffset < 4 || relativeOffset > int.MaxValue ||
+                    relativeOffset > exportEntry.SerialSize - 4)
                     throw new InvalidDataException($"La posición del bytecode de '{className}.{function.Name}' no es válida.");
-                targets.Add(new UnrealFunctionTarget(function.Name.ToString(), (int)function,
-                    checked((int)relativeOffset), function.ScriptSize));
+                int sizeFieldOffset = checked(exportEntry.SerialOffset + (int)relativeOffset - 4);
+                int originalScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
+                    packageBytes.AsSpan(sizeFieldOffset, 4));
+                if (originalScriptSize < 0 || relativeOffset > exportEntry.SerialSize - originalScriptSize)
+                    throw new InvalidDataException($"El tamaño serializado del bytecode de '{className}.{function.Name}' excede el export.");
+                targets.Add(new UnrealFunctionTarget(function.Name.ToString(), exportReference,
+                    checked((int)relativeOffset), originalScriptSize));
             }
 
             var result = UnrealScriptCompilerPipeline.CompileClassSource(
