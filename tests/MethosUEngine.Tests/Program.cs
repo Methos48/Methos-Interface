@@ -404,7 +404,7 @@ Assert(validStateCloseRepair.Repairs.All(item => item.ClosuresRemoved == 0) &&
 Assert(UnrealScriptSourceIndex.ParseFunctions(validStateCloseRepair.Source).Count == 2,
     "A valid state declaration did not survive closure repair.");
 
-string sourceWithRedundantTrailingReturn = """
+string sourceForClosureReturnRepair = """
 class RedundantReturn extends Object;
 function int GetValue()
 {
@@ -412,7 +412,7 @@ function int GetValue()
     return;
 }
 """;
-var redundantReturnRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceWithRedundantTrailingReturn);
+var redundantReturnRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceForClosureReturnRepair);
 Assert(redundantReturnRepair.Source.Split("return", StringSplitOptions.None).Length - 1 == 1,
     "A redundant bare return after a value return was not removed.");
 Assert(UnrealScriptSourceIndex.ParseFunctions(redundantReturnRepair.Source).Count == 1,
