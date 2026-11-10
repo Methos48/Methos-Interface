@@ -393,7 +393,12 @@ if (args.Length > 0)
         { invalidFunctionOffsets++; continue; }
         checkedFunctionOffsets++;
     }
-    Assert(checkedFunctionOffsets > 0, "No UFunction bytecode offsets could be validated against the native package parser.");
+    if (checkedFunctionOffsets == 0)
+        Console.WriteLine($"UFUNCTION OFFSET DIAGNOSTIC: objects={packageFunctions.Length}; invalid={invalidFunctionOffsets}; samples=" +
+            string.Join(" | ", packageFunctions.Take(8).Select(function =>
+                $"{function.Name}: outer={function.Outer?.Name}, script={function.ScriptOffset}, export={function.ExportTable?.SerialOffset}, index={(int)function}")));
+    Assert(checkedFunctionOffsets > 0,
+        $"No UFunction bytecode offsets validated (objects={packageFunctions.Length}, invalid={invalidFunctionOffsets}).");
     Assert(invalidFunctionOffsets == 0, $"UELib returned {invalidFunctionOffsets} invalid UFunction bytecode offsets.");
     Console.WriteLine($"PASS: UELib metadata bridge; classes={packageClasses.Count}, functions={packageFunctions.Length}, validated bytecode offsets={checkedFunctionOffsets}.");
 
