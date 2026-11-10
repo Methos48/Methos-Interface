@@ -90,6 +90,19 @@ static byte[] BuildFunctionFixture()
     return bytes;
 }
 
+if (args.Length >= 4 && args[0] == "--ucc-compile")
+{
+    string runtimeRoot = args[1];
+    string sourceDirectory = args[2];
+    string outputPath = args[3];
+    UccCompileResult result = UccCompiler.CompileInterface(runtimeRoot, sourceDirectory);
+    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
+    File.WriteAllBytes(outputPath, result.PackageBytes);
+    Console.WriteLine($"UCC C# backend: {result.ProfileDescription}; names={result.NameCount}; imports={result.ImportCount}; exports={result.ExportCount}; bytes={result.PackageBytes.Length}");
+    Console.WriteLine(result.CompilerOutput);
+    return;
+}
+
 if (args.Length >= 3 && args[0] == "--export-sources")
 {
     string packagePath = args[1];
