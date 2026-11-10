@@ -486,6 +486,20 @@ Assert(restoredSoundCount == 4 &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("script.SetDefaultAction(EDefaultOK)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("DialogShow(DIALOG_NumberPad, MakeFullSystemMsg(GetSystemMessage(72), Info.Name, \"\")", StringComparison.Ordinal),
+
+string decompiledEnumCastCall = """
+class EnumCastCallTest;
+function Test() { if (IsFiltered(byte(Type), SnoopIndex)) return; }
+""";
+string referenceEnumCastCall = """
+class EnumCastCallTest;
+function Test() { if (IsFiltered(echattype(Type), SnoopIndex)) return; }
+""";
+string restoredEnumCastCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
+    decompiledEnumCastCall, referenceEnumCastCall, out int restoredEnumCastCallCount);
+Assert(restoredEnumCastCallCount == 1 &&
+       restoredEnumCastCall.Contains("IsFiltered(echattype(Type), SnoopIndex)", StringComparison.Ordinal),
+    "Primitive byte cast was not restored to the original enum cast in a call argument.");
     "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
 
 string decompiledAssignmentSource = """
