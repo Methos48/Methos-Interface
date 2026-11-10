@@ -585,6 +585,21 @@ Assert(repairedNestingFunctions.Count == 1 &&
        repairedNestingFunctionSource.Contains("if (Flag) return true;", StringComparison.Ordinal),
     "An excessively nested decompiled function was not restored from its original structure.");
 
+string decompiledInvalidSuper = """
+class SuperRepairTest;
+function Clear() { Child.super(SuperRepairTest).Clear(); }
+""";
+string referenceInvalidSuper = """
+class SuperRepairTest;
+function Clear() { Child.Clear(); }
+""";
+string repairedInvalidSuper = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
+    decompiledInvalidSuper, referenceInvalidSuper, out var repairedSuperFunctions);
+Assert(repairedSuperFunctions.Count == 1 &&
+       repairedInvalidSuper.Contains("Child.Clear();", StringComparison.Ordinal) &&
+       !repairedInvalidSuper.Contains("Child.super(", StringComparison.Ordinal),
+    "An invalid super call on a child object was not restored from the reference.");
+
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
