@@ -26,7 +26,7 @@ COMPILAR
 3. Pulsa COMPILAR.
 4. El programa valida el resultado y solo entonces reemplaza el paquete de destino.
 
-Para Interface.u de Lineage II Interlude se utiliza el compilador UCC de Interlude incluido en el instalador. Se ejecuta internamente en una carpeta temporal; no necesitas instalar UCC, .NET ni ejecutar scripts manualmente.
+Para Interface.u de Lineage II Interlude se utiliza el compilador UCC de Interlude incluido en el instalador. El instalador incorpora el runtime completo y las 169 fuentes de referencia; no tienes que descargarlos por separado. Se ejecuta internamente en una carpeta temporal; no necesitas instalar UCC, .NET ni ejecutar scripts manualmente.
 El resultado se comprueba con el analizador de paquetes y UELib. La prueba automatizada confirma 169 clases y las mismas tablas de nombres, imports y exports que el Interface.u de referencia.
 El paquete recompilado no tiene por qué ser idéntico byte por byte al original: UCC vuelve a serializar el paquete.
 
