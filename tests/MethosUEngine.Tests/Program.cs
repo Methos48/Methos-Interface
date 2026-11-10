@@ -107,6 +107,17 @@ Assert(reparsed.Exports.SequenceEqual(parsed.Exports), "Exports changed after ro
 Assert(rebuilt.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }), "Opaque object payload moved or changed.");
 Assert(rebuilt.Length > fixture.Length, "Round-trip tables were not appended.");
 
+var replacementBuilder = new UnrealPackageBuilder(parsed);
+byte[] replacementPayload = { 0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x02 };
+replacementBuilder.ReplaceExportPayload(1, replacementPayload);
+byte[] replacedBytes = replacementBuilder.Build();
+var replacedPackage = UnrealPackageIndex.Parse(replacedBytes);
+Assert(replacedPackage.Exports[0].SerialSize == replacementPayload.Length, "Replacement export size is incorrect.");
+Assert(replacedBytes.AsSpan(replacedPackage.Exports[0].SerialOffset, replacementPayload.Length)
+    .SequenceEqual(replacementPayload), "Replacement export payload is incorrect.");
+Assert(replacedBytes.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }),
+    "Original payload bytes were not preserved in the append-only replacement.");
+
 var builder = new UnrealPackageBuilder(parsed);
 int newObjectName = builder.AddName("界面");
 int coreName = builder.AddName("Core");
