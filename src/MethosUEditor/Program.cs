@@ -288,6 +288,10 @@ internal sealed class MainForm : Form
                         try
                         {
                             string referenceSource = File.ReadAllText(referenceSourcePath);
+                            source = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
+                                source, referenceSource, out var restoredFunctions);
+                            if (restoredFunctions.Count > 0)
+                                Log($"Funciones que UELib no pudo descompilar, recuperadas de la referencia: {safeName}.uc; funciones={restoredFunctions.Count}.");
                             source = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                                 source, referenceSource, out int restoredEnumArguments);
                             if (restoredEnumArguments > 0)
