@@ -39,7 +39,7 @@ public static class UnrealScriptCallsiteArgumentRestorer
                     string currentValue = currentArgument.Text.Trim();
                     string originalValue = referenceArguments[argumentIndex].Text.Trim();
                     if (!int.TryParse(currentValue, out _) ||
-                        !Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*$",
+                        !Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
                             RegexOptions.CultureInvariant))
                         continue;
 
