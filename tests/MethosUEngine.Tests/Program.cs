@@ -150,12 +150,6 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptFailedFunctionRepair.RestoreInvalidTrailingReturns(
                 normalized, referenceText, out var repairedTrailingReturns);
             totalNormalized += repairedTrailingReturns.Count;
-            if (Path.GetFileName(sourcePath).Equals("DeliverWnd.uc", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine("DeliverWnd CURRENT DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "DialogShow"));
-                Console.WriteLine("DeliverWnd REFERENCE DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "DialogShow"));
-                Console.WriteLine($"DeliverWnd SYMBOLIC CALL ARGUMENTS RESTORED: {restoredCallsiteArguments}.");
-            }
             if (Path.GetFileName(sourcePath).Equals("AutoBuffWnd.uc", StringComparison.OrdinalIgnoreCase))
                 Console.WriteLine("AutoBuffWnd EMPTY RETURNS REMOVED: " + string.Join(",", repairedTrailingReturns));
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
@@ -171,6 +165,12 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
                 normalized, referenceText, out int restoredCallsiteArguments);
             totalNormalized += restoredCallsiteArguments;
+            if (Path.GetFileName(sourcePath).Equals("DeliverWnd.uc", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("DeliverWnd CURRENT DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "DialogShow"));
+                Console.WriteLine("DeliverWnd REFERENCE DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "DialogShow"));
+                Console.WriteLine($"DeliverWnd SYMBOLIC CALL ARGUMENTS RESTORED: {restoredCallsiteArguments}.");
+            }
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
                 normalized, referenceText, out int restoredSymbolicAssignments);
             totalNormalized += restoredSymbolicAssignments;
