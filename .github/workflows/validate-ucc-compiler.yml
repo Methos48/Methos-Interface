@@ -87,8 +87,12 @@ jobs:
         shell: pwsh
         run: |
           $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
+          $editedSourceDir = Join-Path $env:RUNNER_TEMP "Methos-U-Edited-Source-Test"
+          Copy-Item -LiteralPath $sourceDir -Destination $editedSourceDir -Recurse -Force
+          $editedClass = Join-Path $editedSourceDir "UICommonAPI.uc"
+          [System.IO.File]::AppendAllText($editedClass, [Environment]::NewLine + "// Methos U edited-source compile test", [System.Text.Encoding]::Unicode)
           $output = Join-Path $env:KIT "Testar\system\Interface-csharp.u"
-          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --ucc-compile $env:KIT $sourceDir $output
+          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --ucc-compile $env:KIT $editedSourceDir $output
           if ($LASTEXITCODE -ne 0) { throw "El backend UCC integrado en Methos U no pudo compilar." }
           & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
           $generatedHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash
