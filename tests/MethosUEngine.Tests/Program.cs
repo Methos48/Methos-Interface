@@ -128,10 +128,6 @@ if (args.Length >= 3 && args[0] == "--export-sources")
                 for (int line = 215; line < Math.Min(240, stateLines.Length); line++)
                     Console.WriteLine($"DECOMPILED {name}:{line + 1}: {stateLines[line]}");
             }
-            var returnNormalization = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(source);
-            source = returnNormalization.Source;
-            if (returnNormalization.Repairs.Count > 0)
-                Console.WriteLine($"REDUNDANT RETURNS REMOVED: {name}={returnNormalization.Repairs.Count}");
             try
             {
                 source = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source).Source;
@@ -139,6 +135,17 @@ if (args.Length >= 3 && args[0] == "--export-sources")
             catch
             {
                 // Keep the original decompiler output; the UCC compatibility test will decide if it is usable.
+            }
+            try
+            {
+                var returnNormalization = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(source);
+                source = returnNormalization.Source;
+                if (returnNormalization.Repairs.Count > 0)
+                    Console.WriteLine($"REDUNDANT RETURNS REMOVED: {name}={returnNormalization.Repairs.Count}");
+            }
+            catch (InvalidDataException normalizationError)
+            {
+                Console.WriteLine($"RETURN NORMALIZATION SKIPPED: {name}: {normalizationError.Message}");
             }
             File.WriteAllText(Path.Combine(outputDirectory, safeName + ".uc"),
                 source, new System.Text.UnicodeEncoding(false, true));
@@ -413,9 +420,10 @@ function int GetValue()
 }
 """;
 var redundantReturnRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceForClosureReturnRepair);
-Assert(redundantReturnRepair.Source.Split("return", StringSplitOptions.None).Length - 1 == 1,
+var normalizedClosureReturn = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(redundantReturnRepair.Source);
+Assert(normalizedClosureReturn.Source.Split("return", StringSplitOptions.None).Length - 1 == 1,
     "A redundant bare return after a value return was not removed.");
-Assert(UnrealScriptSourceIndex.ParseFunctions(redundantReturnRepair.Source).Count == 1,
+Assert(UnrealScriptSourceIndex.ParseFunctions(normalizedClosureReturn.Source).Count == 1,
     "The function with a redundant return did not parse after repair.");
 
 string brokenBeforeDefaults = """
