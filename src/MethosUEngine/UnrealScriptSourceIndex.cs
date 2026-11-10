@@ -141,8 +141,8 @@ public static class UnrealScriptSourceIndex
             repairs.Add(new ClosureRepair(item.Name, item.Line, item.Count));
         }
 
-        // Remove only unmatched closing braces at EOF. A global orphan-brace pass can
-        // mistake a valid function terminator for an orphan after an earlier bad scope.
+        // Any closing brace encountered at global depth zero is an orphan: every real
+        // function/state/class scope has already contributed its opening brace to this scan.
         List<Token> repairedTokens = Tokenize(repaired);
         var unmatchedClosures = new List<Token>();
         int globalDepth = 0;
@@ -155,12 +155,7 @@ public static class UnrealScriptSourceIndex
                 else unmatchedClosures.Add(repairedTokens[i]);
             }
         }
-        int lastNonClose = repairedTokens.FindLastIndex(token => token.Text != "}");
-        var trailingOrphans = unmatchedClosures
-            .Where(token => repairedTokens.FindIndex(candidate => candidate.Start == token.Start) > lastNonClose)
-            .OrderByDescending(token => token.Start)
-            .ToArray();
-        foreach (var orphan in trailingOrphans)
+        foreach (var orphan in unmatchedClosures.OrderByDescending(token => token.Start))
         {
             repaired = repaired.Remove(orphan.Start, 1);
             repairs.Add(new ClosureRepair("orphan", orphan.Line, 0, 1));
