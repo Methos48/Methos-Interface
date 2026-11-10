@@ -36,6 +36,7 @@ public static class UnrealScriptCompilerPipeline
                 Array.Empty<UnrealScriptSourceIndex.ClosureRepair>());
         var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(repairResult.Source);
         var builder = new UnrealPackageBuilder(package);
+        var compiledBytecode = new List<(UnrealFunctionTarget Target, byte[] Bytecode)>();
         int compiled = 0;
         var usedTargets = new HashSet<int>();
 
@@ -51,12 +52,27 @@ public static class UnrealScriptCompilerPipeline
             UnrealScriptPatcher.ReplaceExportBytecode(package, builder,
                 target.ExportReference, target.ScriptOffsetRelative,
                 target.OriginalScriptSize, bytecode);
+            compiledBytecode.Add((target, bytecode));
             compiled++;
         }
 
         if (compiled == 0)
             throw new InvalidDataException("No se encontraron cuerpos de función compilables en el archivo .uc.");
 
-        return new UnrealScriptCompileResult(builder.Build(), compiled, repairResult.Repairs);
+        byte[] rebuiltPackage = builder.Build();
+        var rebuiltIndex = UnrealPackageIndex.Parse(rebuiltPackage);
+        foreach (var item in compiledBytecode)
+        {
+            var export = rebuiltIndex.Exports[item.Target.ExportReference - 1];
+            byte[] payload = rebuiltPackage.AsSpan(export.SerialOffset, export.SerialSize).ToArray();
+            int sizeOffset = item.Target.ScriptOffsetRelative - 4;
+            if (sizeOffset < 0 || sizeOffset > payload.Length - 4 ||
+                System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4)) != item.Bytecode.Length)
+                throw new InvalidDataException($"La verificación posterior a la compilación falló para '{item.Target.Name}': tamaño de bytecode incorrecto.");
+            if (item.Target.ScriptOffsetRelative > payload.Length - item.Bytecode.Length ||
+                !payload.AsSpan(item.Target.ScriptOffsetRelative, item.Bytecode.Length).SequenceEqual(item.Bytecode))
+                throw new InvalidDataException($"La verificación posterior a la compilación falló para '{item.Target.Name}': bytecode distinto al generado.");
+        }
+        return new UnrealScriptCompileResult(rebuiltPackage, compiled, repairResult.Repairs);
     }
 }
