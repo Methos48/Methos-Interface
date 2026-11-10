@@ -134,7 +134,7 @@ public static class UnrealScriptCallsiteArgumentRestorer
                     continue;
 
                 string originalValue = referenceValues[occurrence];
-                if (!Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*$",
+                if (!Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
                     RegexOptions.CultureInvariant))
                     continue;
 
@@ -154,7 +154,7 @@ public static class UnrealScriptCallsiteArgumentRestorer
 
     private static List<Assignment> ReadAssignments(string body)
     {
-        const string pattern = @"(?<left>[A-Za-z_]\\w*(?:\\s*\\[[^\\]]+\\])?(?:\\s*\\.\\s*[A-Za-z_]\\w*)*)\\s*=\\s*(?<right>-?\\d+|(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*)\\s*;";
+        const string pattern = @"(?<left>[A-Za-z_]\w*(?:\s*\[[^\]]+\])?(?:\s*\.\s*[A-Za-z_]\w*)*)\s*=\s*(?<right>-?\d+|(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*;";
         var mask = BuildCodeMask(body);
         var assignments = new List<Assignment>();
         foreach (Match match in Regex.Matches(body, pattern, RegexOptions.CultureInvariant))
@@ -162,7 +162,7 @@ public static class UnrealScriptCallsiteArgumentRestorer
             int leftStart = match.Groups["left"].Index;
             int rightStart = match.Groups["right"].Index;
             if (!mask[leftStart] || !mask[rightStart]) continue;
-            assignments.Add(new Assignment(match.Groups["left"].Value.Replace(" ", "", StringComparison.Ordinal),
+            assignments.Add(new Assignment(Regex.Replace(match.Groups["left"].Value, @"\s+", ""),
                 match.Groups["right"].Value, rightStart, match.Groups["right"].Length));
         }
         return assignments;
