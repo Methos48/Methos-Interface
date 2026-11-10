@@ -352,9 +352,18 @@ state Idle
     }
 }
 """;
-string tripleQuoteSource = """class Sample; function QuoteTest() { Call("\""); }""";
-Assert(UnrealScriptSourceIndex.ParseFunctions(tripleQuoteSource).Count == 1,
-    "Escaped quote confused the source scanner.");
+string escapedQuoteSource = """class Sample; function QuoteTest() { Call("\""); }""";
+var escapedQuoteRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(escapedQuoteSource);
+Assert(escapedQuoteRepair.StringEscapesRepaired == 0 &&
+    UnrealScriptSourceIndex.ParseFunctions(escapedQuoteRepair.Source).Count == 1,
+    "A valid escaped quote was modified or mis-scanned.");
+
+string malformedTrailingSlashSource = """class Sample; function PathTest() { Call("..\REPLAY\"); }""";
+var trailingSlashRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(malformedTrailingSlashSource);
+Assert(trailingSlashRepair.StringEscapesRepaired == 1 &&
+    UnrealScriptSourceIndex.ParseFunctions(trailingSlashRepair.Source).Count == 1 &&
+    trailingSlashRepair.Source.Contains("""Call("..\REPLAY\\");"""),
+    "A malformed trailing-backslash string was not normalized safely.");
 
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
