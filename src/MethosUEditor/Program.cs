@@ -253,7 +253,7 @@ internal sealed class MainForm : Form
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
-        int ok = 0, failed = 0, repairedFunctions = 0, insertedClosures = 0, nativeFunctions = 0;
+        int ok = 0, failed = 0, repairedFunctions = 0, insertedClosures = 0, removedClosures = 0, nativeFunctions = 0;
         foreach (var obj in classes)
         {
             try
@@ -274,7 +274,8 @@ internal sealed class MainForm : Form
                         foreach (var item in repair.Repairs)
                         {
                             insertedClosures += item.ClosuresInserted;
-                            Log($"Fuente reparada: {safeName}.{item.FunctionName} (línea {item.Line}); se insertaron {item.ClosuresInserted} llaves de cierre.");
+                            removedClosures += item.ClosuresRemoved;
+                            Log($"Fuente reparada: {safeName}.{item.FunctionName} (línea {item.Line}); llaves insertadas={item.ClosuresInserted}; cierres sobrantes eliminados={item.ClosuresRemoved}.");
                         }
                     }
                 }
@@ -297,7 +298,7 @@ internal sealed class MainForm : Form
             }
             catch (Exception ex) { failed++; Log($"No se pudo exportar una clase: {ex.Message}"); }
         }
-        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}; funciones descompiladas/verificadas por Methos: {nativeFunctions}. Carpeta: {output}");
+        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}; cierres sobrantes eliminados: {removedClosures}; funciones descompiladas/verificadas por Methos: {nativeFunctions}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
     });
 
