@@ -55,6 +55,7 @@ public static class UnrealScriptSourceIndex
             }
             if (bodyOpen < 0) { i = closeParen; continue; }
 
+            Token open = tokens[bodyOpen];
             depth = 0;
             int bodyClose = -1;
             for (int j = bodyOpen; j < tokens.Count; j++)
@@ -68,7 +69,6 @@ public static class UnrealScriptSourceIndex
                 throw new InvalidDataException($"La función '{nameToken.Text}' (línea {keyword.Line}) tiene un bloque sin cerrar; apertura en línea {open.Line}, offset {open.Start}. Fragmento: {excerpt}");
             }
 
-            Token open = tokens[bodyOpen];
             Token close = tokens[bodyClose];
             int bodyStart = open.End;
             int bodyEnd = close.Start;
