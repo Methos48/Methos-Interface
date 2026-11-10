@@ -230,33 +230,63 @@ internal sealed class MainForm : Form
         var systemDir = Path.GetDirectoryName(ucc)!;
         var root = Directory.GetParent(systemDir)?.FullName ?? throw new InvalidOperationException("No se pudo identificar la carpeta raíz del compilador.");
         var temp = Path.Combine(Path.GetTempPath(), "MethosU_" + Guid.NewGuid().ToString("N"));
-        var tempSystem = Path.Combine(temp, Path.GetFileName(systemDir));
-        CopyDirectory(systemDir, tempSystem);
-        var classDir = Path.Combine(temp, baseName, "Classes");
-        Directory.CreateDirectory(classDir);
-        foreach (var file in ucFiles) File.Copy(file, Path.Combine(classDir, Path.GetFileName(file)), true);
-        ConfigureCompilerIni(tempSystem, baseName);
-        Log($"Compilando {ucFiles.Length} clases con {ucc}...");
-        var tempUcc = Path.Combine(tempSystem, Path.GetFileName(ucc));
-        var ini = FindCompilerIni(tempSystem);
-        var args = "make" + (ini == null ? "" : " -ini=" + Quote(Path.GetFileName(ini)));
-        var psi = new ProcessStartInfo(tempUcc, args) { WorkingDirectory = tempSystem, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-        using var process = new Process { StartInfo = psi };
-        var outputText = new StringBuilder();
-        process.OutputDataReceived += (_, e) => { if (e.Data != null) { lock (outputText) outputText.AppendLine(e.Data); Log(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { if (e.Data != null) { lock (outputText) outputText.AppendLine(e.Data); Log(e.Data); } };
-        process.Start(); process.BeginOutputReadLine(); process.BeginErrorReadLine(); process.WaitForExit();
-        var result = Path.Combine(tempSystem, baseName + ".u");
-        if (!File.Exists(result))
+        try
         {
-            result = Directory.GetFiles(tempSystem, "*.u", SearchOption.TopDirectoryOnly).FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Equals(baseName, StringComparison.OrdinalIgnoreCase)) ?? "";
+            var tempSystem = Path.Combine(temp, Path.GetFileName(systemDir));
+            CopyDirectory(systemDir, tempSystem);
+            var classDir = Path.Combine(temp, baseName, "Classes");
+            Directory.CreateDirectory(classDir);
+            var duplicateNames = ucFiles.GroupBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            if (duplicateNames.Count > 0)
+                throw new InvalidOperationException("Hay nombres de clase .uc duplicados en distintas subcarpetas: " + string.Join(", ", duplicateNames));
+            foreach (var file in ucFiles) File.Copy(file, Path.Combine(classDir, Path.GetFileName(file)), true);
+            ConfigureCompilerIni(tempSystem, baseName);
+
+            // UCC puede omitir la compilación si ya existe el paquete .u.
+            // Se elimina únicamente la copia temporal; el original del usuario permanece intacto.
+            var stalePackage = Path.Combine(tempSystem, baseName + ".u");
+            if (File.Exists(stalePackage)) File.Delete(stalePackage);
+
+            Log($"Compilando {ucFiles.Length} clases con {ucc}...");
+            var tempUcc = Path.Combine(tempSystem, Path.GetFileName(ucc));
+            var ini = FindCompilerIni(tempSystem);
+            var args = "make" + (ini == null ? "" : " -ini=" + Quote(Path.GetFileName(ini)));
+            var psi = new ProcessStartInfo(tempUcc, args) { WorkingDirectory = tempSystem, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+            using var process = new Process { StartInfo = psi };
+            process.OutputDataReceived += (_, e) => { if (e.Data != null) Log(e.Data); };
+            process.ErrorDataReceived += (_, e) => { if (e.Data != null) Log(e.Data); };
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            if (!process.WaitForExit((int)TimeSpan.FromMinutes(5).TotalMilliseconds))
+            {
+                try { process.Kill(true); } catch { }
+                throw new TimeoutException("UCC superó el límite de 5 minutos y fue detenido. Revisa el compilador y sus dependencias.");
+            }
+            process.WaitForExit(); // Espera también a que terminen los lectores de salida.
+
+            var result = Path.Combine(tempSystem, baseName + ".u");
+            if (process.ExitCode != 0 || !File.Exists(result))
+                throw new InvalidOperationException("UCC no generó el paquete. Revisa el registro. Comprueba que el compilador sea de Interlude y tenga Core, Engine, Fire, Editor y NWindow.");
+
+            // Comprobación estructural antes de reemplazar el archivo de destino.
+            using (var validationPackage = UnrealLoader.LoadPackage(result, FileAccess.Read))
+            {
+                validationPackage.InitializePackage();
+                var builtClasses = validationPackage.Objects.OfType<UClass>().Count(o => (int)o > 0);
+                if (builtClasses == 0)
+                    throw new InvalidDataException("UCC creó un archivo, pero no contiene clases UnrealScript reconocibles. No se reemplazó el .u original.");
+                Log($"Validación del paquete: {builtClasses} clases detectadas.");
+            }
+
+            var destination = Path.Combine(CompleteDir, baseName + ".u");
+            CopyWithBackup(result, destination);
+            Log($"Compilación terminada y validada: {destination}");
         }
-        if (process.ExitCode != 0 || string.IsNullOrEmpty(result) || !File.Exists(result))
-            throw new InvalidOperationException("UCC no generó el paquete. Revisa los errores del registro. Comprueba que el compilador sea de la misma crónica y que tenga Core, Engine, Fire, Editor y NWindow.");
-        var destination = Path.Combine(CompleteDir, baseName + ".u");
-        CopyWithBackup(result, destination);
-        Log($"Compilación terminada: {destination}");
-        try { Directory.Delete(temp, true); } catch { }
+        finally
+        {
+            try { if (Directory.Exists(temp)) Directory.Delete(temp, true); } catch { }
+        }
     });
 
     private static string? FindTool(string name)
@@ -273,7 +303,7 @@ internal sealed class MainForm : Form
 
     private static string? FindCompilerIni(string systemDir)
     {
-        var preferred = new[] { "UT2003.ini", "L2.ini", "Default.ini", "Unreal.ini" };
+        var preferred = new[] { "L2.ini", "Unreal.ini", "Default.ini", "UT2003.ini" };
         foreach (var name in preferred)
         {
             var path = Path.Combine(systemDir, name);
