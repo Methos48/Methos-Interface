@@ -223,11 +223,11 @@ Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 1.5f;")
     .SequenceEqual(new byte[] { 0x04, 0x1E, 0x00, 0x00, 0xC0, 0x3F, 0x47 }), "Float return bytecode is incorrect.");
 Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"界\";")
     .SequenceEqual(new byte[] { 0x04, 0x34, 0x4C, 0x75, 0, 0, 0x47 }), "Unicode string return bytecode is incorrect.");
-byte[] pathLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "..\L2text\";""");
-byte[] quoteLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"\"\";");
-Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(quoteLiteralCode) == "return \"\"\";",
+byte[] pathLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "..\\L2text\\";""");
+byte[] quoteLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "\"";""");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(quoteLiteralCode) == """return "\"";""",
     "Triple-quote string literal was not preserved.");
-Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(pathLiteralCode) == """return "..\L2text\";""",
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(pathLiteralCode) == """return "..\\L2text\\";""",
     "A trailing path backslash was not preserved in string bytecode.");
 Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"ok // text\"; // trailing comment")
     .SequenceEqual(new byte[] { 0x04, 0x1F, (byte)'o', (byte)'k', (byte)' ', (byte)'/', (byte)'/', (byte)' ', (byte)'t', (byte)'e', (byte)'x', (byte)'t', 0, 0x47 }),
@@ -263,7 +263,7 @@ function int Add(int A, int B)
     // } must not close the function
     local string S;
     S = "}";
-    S = "..\L2text\";
+    S = "..\\L2text\\";
     if (A > 0) { return A + B; }
     /* } nested-looking comment */
     return 0;
@@ -277,13 +277,13 @@ state Idle
     }
 }
 """;
-string tripleQuoteSource = "class Sample; function QuoteTest() { Call(\"\"\" ); }";
+string tripleQuoteSource = """class Sample; function QuoteTest() { Call("\\""); }""";
 Assert(UnrealScriptSourceIndex.ParseFunctions(tripleQuoteSource).Count == 1,
     "Triple-quote literal confused the source scanner.");
 
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
-Assert(indexedFunctions[0].Body.Contains("L2text") && indexedFunctions[0].Body.Contains("\\"),
+Assert(indexedFunctions[0].Body.Contains("L2text") && indexedFunctions[0].Body.Contains("\\\\"),
     "A path string ending in a backslash was not scanned as a closed string literal.");
 Assert(indexedFunctions[0].Name == "Add" && indexedFunctions[0].Body.Contains("return A + B"),
     "Function source indexer failed to extract the Add body.");
