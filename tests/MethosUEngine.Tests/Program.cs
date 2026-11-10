@@ -535,33 +535,25 @@ if (args.Length > 0)
                 int? privateByteScriptSize = byteScriptSizeProperty?.GetValue(function) as int?;
                 if (privateByteScriptSize == declaredScriptSize) privateByteSizeMatches++;
                 if (function.ScriptSize == declaredScriptSize) scriptSizeMatches++;
-                if ((declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize) &&
-                    offsetDiagnostics.Count < 12)
-                    offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, rel={relativeOffset}, stored={declaredScriptSize}, privateByteSize={privateByteScriptSize}, ScriptSize={function.ScriptSize}, export={export.SerialOffset}/{export.SerialSize}, UELib={uelibExportOffset}/{uelibExportSize}");
-                if (declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize)
+                int actualScriptSize = function.ScriptSize;
+                if (actualScriptSize <= 0 || relativeOffset > export.SerialSize - actualScriptSize)
                 {
                     invalidFunctionOffsets++;
                     if (offsetDiagnostics.Count < 12)
-                        offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, scriptOffset={relativeOffset}, declaredSize={declaredScriptSize}, ScriptSize={function.ScriptSize}, UELibExport={uelibExportOffset}/{uelibExportSize}, nativeExport={export.SerialOffset}/{export.SerialSize}");
+                        offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, rel={relativeOffset}, stored={declaredScriptSize}, privateByteSize={privateByteScriptSize}, ScriptSize={actualScriptSize}, export={export.SerialOffset}/{export.SerialSize}, UELib={uelibExportOffset}/{uelibExportSize}");
                     continue;
                 }
                 validFunctionOffsets++;
-                if (function.ScriptSize > 0 && relativeOffset <= export.SerialSize - function.ScriptSize)
-                {
-                    publicScriptSizesInBounds++;
-                    int publicEnd = checked(export.SerialOffset + (int)relativeOffset + function.ScriptSize - 1);
-                    if (originalPackageBytes[publicEnd] == 0x47) publicScriptSizesEndCorrectly++;
-                }
-                if (originalPackageBytes[checked(export.SerialOffset + (int)relativeOffset + declaredScriptSize - 1)] == 0x47)
+                publicScriptSizesInBounds++;
+                int publicEnd = checked(export.SerialOffset + (int)relativeOffset + actualScriptSize - 1);
+                if (originalPackageBytes[publicEnd] == 0x47) publicScriptSizesEndCorrectly++;
+                if (declaredScriptSize > 0 && relativeOffset <= export.SerialSize - declaredScriptSize &&
+                    originalPackageBytes[checked(export.SerialOffset + (int)relativeOffset + declaredScriptSize - 1)] == 0x47)
                     declaredSizesEndCorrectly++;
                 try
                 {
-                    if (function.ScriptSize <= 0 || relativeOffset > export.SerialSize - function.ScriptSize)
-                        throw new InvalidDataException("UELib ScriptSize is outside export bounds.");
-                    int scriptStart = checked(export.SerialOffset + (int)relativeOffset);
-                    byte[] scriptBytes = originalPackageBytes.AsSpan(scriptStart, function.ScriptSize).ToArray();
-                    _ = UnrealScriptFunctionDecompiler.DecompileReturnOnly(scriptBytes,
-                        objectResolver: realPackage.ResolveObjectName);
+                    _ = UnrealScriptFunctionDecompiler.DecompileExport(realPackage, exportReference,
+                        (int)relativeOffset, declaredScriptSize, actualScriptSize);
                     nativeBytecodeDecoded++;
                 }
                 catch (NotSupportedException ex)
