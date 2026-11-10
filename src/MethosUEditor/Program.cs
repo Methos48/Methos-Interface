@@ -10,8 +10,26 @@ namespace MethosUEditor;
 internal static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Length >= 2 && args[0].Equals("--self-test", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                using var package = UnrealLoader.LoadPackage(args[1], FileAccess.Read);
+                package.InitializePackage();
+                var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
+                if (classes.Count == 0) throw new InvalidOperationException("No se detectaron clases UnrealScript.");
+                var sample = classes[0].Decompile();
+                if (sample.Length < 100) throw new InvalidOperationException("La descompilación no produjo código fuente suficiente.");
+                Environment.ExitCode = 0;
+            }
+            catch
+            {
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         ApplicationConfiguration.Initialize();
         Application.Run(new MainForm());
     }
