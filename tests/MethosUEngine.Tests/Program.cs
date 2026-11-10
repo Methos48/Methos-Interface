@@ -158,6 +158,9 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
                 normalized, referenceText, out int restoredCallsiteArguments);
             totalNormalized += restoredCallsiteArguments;
+            normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+                normalized, referenceText, out int restoredSymbolicAssignments);
+            totalNormalized += restoredSymbolicAssignments;
             if (Path.GetFileName(sourcePath).Equals("UICommonAPI.uc", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"UICommonAPI RESTORATION COUNTS: enum={restoredEnumArguments}; callsite={restoredCallsiteArguments}; failed-functions={repairedFunctions.Count}.");
