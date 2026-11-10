@@ -107,6 +107,24 @@ Assert(reparsed.Exports.SequenceEqual(parsed.Exports), "Exports changed after ro
 Assert(rebuilt.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }), "Opaque object payload moved or changed.");
 Assert(rebuilt.Length > fixture.Length, "Round-trip tables were not appended.");
 
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return;")
+    .SequenceEqual(new byte[] { 0x3A, 0x47 }), "Void return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 0;")
+    .SequenceEqual(new byte[] { 0x04, 0x25, 0x47 }), "Zero return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 1;")
+    .SequenceEqual(new byte[] { 0x04, 0x26, 0x47 }), "One return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 42;")
+    .SequenceEqual(new byte[] { 0x04, 0x1D, 42, 0, 0, 0, 0x47 }), "Integer return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return -5;")
+    .SequenceEqual(new byte[] { 0x04, 0x1D, 0xFB, 0xFF, 0xFF, 0xFF, 0x47 }), "Negative integer return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return true;")
+    .SequenceEqual(new byte[] { 0x04, 0x27, 0x47 }), "Boolean return bytecode is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"ok // text\"; // trailing comment")
+    .SequenceEqual(new byte[] { 0x04, 0x1F, (byte)'o', (byte)'k', (byte)' ', (byte)'/', (byte)'/', (byte)' ', (byte)'t', (byte)'e', (byte)'x', (byte)'t', 0, 0x47 }),
+    "String return bytecode or comment handling is incorrect.");
+Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 'Core';", _ => 7)
+    .SequenceEqual(new byte[] { 0x04, 0x21, 7, 0, 0, 0, 0x47 }), "Name return bytecode is incorrect.");
+
 string sampleSource = """
 class Sample extends Object;
 
