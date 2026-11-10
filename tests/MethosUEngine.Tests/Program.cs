@@ -410,7 +410,10 @@ if (args.Length > 1)
         .Where(item => (int)item > 0)
         .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
     var sourcePackageFunctions = sourceClasses.Values.SelectMany(EnumerateClassFunctions).ToArray();
+    var sourcePackageIndex = UnrealPackageIndex.Open(args[0]);
+    byte[] sourcePackageBytes = File.ReadAllBytes(args[0]);
     int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
+    int verifiedNativeRoundTrips = 0, unsupportedNativeFunctions = 0;
     foreach (var entry in sourceFiles)
     {
         string sourceClassName = Path.GetFileNameWithoutExtension(entry.Name);
@@ -422,8 +425,10 @@ if (args.Length > 1)
         sourceClassMatches++;
         using var stream = entry.Open();
         using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
+        string sourceText = reader.ReadToEnd();
         var functionsInSource = UnrealScriptSourceIndex.ParseFunctions(
-            UnrealScriptSourceIndex.RepairMissingFunctionClosures(reader.ReadToEnd()).Source);
+            UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+        var ownedFunctions = new List<UFunction>();
         var ownedNames = new List<string>();
         foreach (var function in sourcePackageFunctions)
         {
@@ -432,6 +437,7 @@ if (args.Length > 1)
                 if (ReferenceEquals(outer, classObject))
                 {
                     ownedNames.Add(function.Name.ToString());
+                    ownedFunctions.Add(function);
                     break;
                 }
             }
@@ -440,8 +446,48 @@ if (args.Length > 1)
             .Count(group => group.Count() > 1);
         var targetNames = ownedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
         missingFunctionMappings += functionsInSource.Count(function => !targetNames.Contains(function.Name));
+
+        foreach (var sourceFunction in functionsInSource)
+        {
+            var matches = ownedFunctions.Where(function =>
+                string.Equals(function.Name.ToString(), sourceFunction.Name, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1 || matches[0].ExportTable == null) continue;
+            var function = matches[0];
+            int exportReference = (int)function;
+            if (exportReference < 1 || exportReference > sourcePackageIndex.Exports.Count) continue;
+            var export = sourcePackageIndex.Exports[exportReference - 1];
+            long relativeLong = function.ScriptOffset - function.ExportTable.SerialOffset;
+            if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
+            int relative = (int)relativeLong;
+            int sizeOffset = export.SerialOffset + relative - 4;
+            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(sourcePackageBytes.AsSpan(sizeOffset, 4));
+            if (scriptSize < 0 || relative > export.SerialSize - scriptSize) continue;
+            try
+            {
+                byte[] originalCode = sourcePackageBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
+                string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
+                    sourcePackageIndex, exportReference, relative, scriptSize);
+                int ResolveName(string name)
+                {
+                    for (int nameIndex = 0; nameIndex < sourcePackageIndex.Names.Count; nameIndex++)
+                        if (string.Equals(sourcePackageIndex.Names[nameIndex], name, StringComparison.OrdinalIgnoreCase))
+                            return nameIndex;
+                    throw new InvalidDataException($"Name not found: {name}");
+                }
+                byte[] sourceCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(sourceFunction.Body, ResolveName);
+                byte[] nativeCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(nativeSource, ResolveName);
+                if (sourceCode.AsSpan().SequenceEqual(originalCode) &&
+                    nativeCode.AsSpan().SequenceEqual(originalCode))
+                    verifiedNativeRoundTrips++;
+            }
+            catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
+            {
+                unsupportedNativeFunctions++;
+            }
+        }
     }
     Console.WriteLine($"SOURCE MAP: matched classes={sourceClassMatches}/{sourceFiles.Length}; missing class files={missingClassFiles}; source functions without package target={missingFunctionMappings}; duplicate target names={duplicateFunctionTargets}.");
+    Console.WriteLine($"NATIVE BYTECODE ROUNDTRIP: exact source+decompiler matches={verifiedNativeRoundTrips}; unsupported or non-literal functions={unsupportedNativeFunctions}.");
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
