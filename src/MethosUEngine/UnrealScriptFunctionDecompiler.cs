@@ -10,6 +10,9 @@ namespace MethosUEngine;
 /// </summary>
 public static class UnrealScriptFunctionDecompiler
 {
+    private const byte EX_LocalVariable = 0x00;
+    private const byte EX_InstanceVariable = 0x01;
+    private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
@@ -26,7 +29,7 @@ public static class UnrealScriptFunctionDecompiler
     private const byte EX_EndOfScript = 0x47;
 
     public static string DecompileReturnOnly(byte[] bytecode,
-        Func<int, string>? nameResolver = null)
+        Func<int, string>? nameResolver = null, Func<int, string>? objectResolver = null)
     {
         ArgumentNullException.ThrowIfNull(bytecode);
         if (bytecode.Length < 2 || bytecode[^1] != EX_EndOfScript)
@@ -41,7 +44,7 @@ public static class UnrealScriptFunctionDecompiler
         }
         else if (statement == EX_Return)
         {
-            string expression = ReadLiteral(bytecode, ref position, nameResolver);
+            string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
             result = $"return {expression};";
         }
         else
@@ -55,7 +58,7 @@ public static class UnrealScriptFunctionDecompiler
     }
 
     public static string DecompileExport(UnrealPackageIndex package, int exportReference,
-        int scriptOffsetRelative, int scriptSize)
+        int scriptOffsetRelative, int scriptSize, Func<int, string>? objectResolver = null)
     {
         ArgumentNullException.ThrowIfNull(package);
         if (exportReference < 1 || exportReference > package.Exports.Count)
@@ -77,14 +80,24 @@ public static class UnrealScriptFunctionDecompiler
             if (index < 0 || index >= package.Names.Count)
                 throw new InvalidDataException($"Índice de nombre inválido en bytecode: {index}.");
             return package.Names[index];
-        });
+        }, objectResolver);
     }
 
-    private static string ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver)
+    private static string ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver,
+        Func<int, string>? objectResolver)
     {
         byte token = ReadByte(data, ref position);
         switch (token)
         {
+            case EX_LocalVariable:
+            case EX_InstanceVariable:
+            case EX_DefaultVariable:
+            {
+                int reference = ReadInt32(data, ref position);
+                string variable = objectResolver?.Invoke(reference)
+                    ?? throw new NotSupportedException("No se proporcionó un resolvedor para variables UnrealScript.");
+                return token == EX_DefaultVariable ? "default." + variable : variable;
+            }
             case EX_IntZero: return "0";
             case EX_IntOne: return "1";
             case EX_True: return "true";
