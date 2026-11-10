@@ -101,14 +101,16 @@ public static class UnrealScriptFunctionCompiler
         {
             bool negative = numeric.StartsWith("-", StringComparison.Ordinal);
             string hex = numeric.TrimStart('+', '-')[2..];
-            if (!uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint raw))
+            if (!long.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out long raw))
                 throw new InvalidDataException($"Literal hexadecimal inválido: {expression}");
-            int value = unchecked((int)(negative ? 0u - raw : raw));
-            WriteIntLiteral(output, value);
+            long signed = negative ? -raw : raw;
+            if (signed < int.MinValue || signed > int.MaxValue)
+                throw new InvalidDataException($"Literal hexadecimal fuera de rango Int32: {expression}");
+            WriteIntLiteral(output, (int)signed);
             return;
         }
 
-        if (numeric.Contains('.') || numeric.Contains('e', StringComparison.OrdinalIgnoreCase))
+        if (numeric.Contains('.') || numeric.Contains("e", StringComparison.OrdinalIgnoreCase))
         {
             if (!float.TryParse(numeric, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
                 throw new InvalidDataException($"Literal float inválido: {expression}");
