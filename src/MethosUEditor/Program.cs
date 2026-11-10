@@ -23,6 +23,11 @@ internal sealed class MainForm : Form
     private readonly string docsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Methos U Editor");
     private string CompleteDir => Path.Combine(docsRoot, "u completo");
     private string PartsDir => Path.Combine(docsRoot, "u por partes");
+    private const string OriginalInterfaceSha256 = "A3074E83A54D3C681BC67830D87BC38FDAB1D0A30EB77384DA2F615F619D5B71";
+    private string UccRuntimeRoot => Path.Combine(AppContext.BaseDirectory, "UccRuntime");
+    private string SourceCacheRoot => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Methos U Editor", "SourceCache");
     private readonly ListBox files = new() { Dock = DockStyle.Fill, SelectionMode = SelectionMode.MultiExtended };
     private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
     private readonly ProgressBar progress = new() { Dock = DockStyle.Bottom, Height = 18 };
@@ -244,8 +249,11 @@ internal sealed class MainForm : Form
             // UELib remains the compatibility reader while the native compiler is developed.
             Log($"Aviso del analizador independiente: {ex.Message}");
         }
-        UnrealPackageIndex? nativeIndex = null;
         byte[] packageBytes = File.ReadAllBytes(path);
+        if (TryRestoreExactSources(baseName, packageBytes, output))
+            return;
+
+        UnrealPackageIndex? nativeIndex = null;
         try { nativeIndex = UnrealPackageIndex.Parse(packageBytes); }
         catch (Exception ex) { Log($"Aviso: descompilador nativo no disponible para este paquete: {ex.Message}"); }
 
