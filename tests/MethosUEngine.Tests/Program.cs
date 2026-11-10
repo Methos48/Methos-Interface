@@ -404,7 +404,7 @@ if (args.Length > 0)
                     continue;
                 }
                 var export = realPackage.Exports[exportReference - 1];
-                long relativeOffset = function.ScriptOffset - export.SerialOffset;
+                long relativeOffset = function.ScriptOffset; // UELib's object stream is already relative to this export.
                 if (relativeOffset >= 4 && relativeOffset <= export.SerialSize - function.ScriptSize)
                     validFunctionOffsets++;
                 else
