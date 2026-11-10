@@ -67,7 +67,7 @@ public static class UnrealScriptFunctionCompiler
         if (expression.Length >= 2 && expression[0] == '"' && expression[^1] == '"')
         {
             string value = DecodeEscapes(expression[1..^1]);
-            if (value.Any(c => c > 0xFF))
+            if (value.Any(c => c > 0x7F))
             {
                 output.WriteByte(EX_UnicodeStringConst);
                 output.Write(Encoding.Unicode.GetBytes(value + "\0"));
