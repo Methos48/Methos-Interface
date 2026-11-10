@@ -247,7 +247,6 @@ function int Add(int A, int B)
     local string S;
     S = "}";
     S = "..\L2text\";
-    S = """;
     if (A > 0) { return A + B; }
     /* } nested-looking comment */
     return 0;
@@ -261,6 +260,10 @@ state Idle
     }
 }
 """;
+string tripleQuoteSource = "class Sample; function QuoteTest() { Call(\"\"\" ); }";
+Assert(UnrealScriptSourceIndex.ParseFunctions(tripleQuoteSource).Count == 1,
+    "Triple-quote literal confused the source scanner.");
+
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
 Assert(indexedFunctions[0].Body.Contains("L2text") && indexedFunctions[0].Body.Contains("\\"),
