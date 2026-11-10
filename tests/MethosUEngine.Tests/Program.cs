@@ -150,6 +150,11 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                 normalized, referenceText, out int restoredEnumArguments);
             totalNormalized += restoredEnumArguments;
+            if (Path.GetFileName(sourcePath).Equals("UICommonAPI.uc", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("UICommonAPI CURRENT CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "PlayConsoleSound"));
+                Console.WriteLine("UICommonAPI REFERENCE CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "PlayConsoleSound"));
+            }
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
                 normalized, referenceText, out int restoredCallsiteArguments);
             totalNormalized += restoredCallsiteArguments;
