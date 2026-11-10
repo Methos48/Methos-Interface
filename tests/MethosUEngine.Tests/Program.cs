@@ -322,8 +322,8 @@ Assert(repairResult.Repairs.Count == 1 && repairResult.Repairs[0].ClosuresInsert
 Assert(UnrealScriptSourceIndex.ParseFunctions(repairResult.Source).Count == 2,
     "Repaired source did not produce two complete function bodies.");
 
-string redundantReturnSource = "class ReturnTest; function int GetValue() { return 7; return; }";
-var normalizedReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(redundantReturnSource);
+string sourceWithRedundantTrailingReturn = "class ReturnTest; function int GetValue() { return 7; return; }";
+var normalizedReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(sourceWithRedundantTrailingReturn);
 Assert(normalizedReturns.Repairs.Count == 1 &&
     UnrealScriptSourceIndex.ParseFunctions(normalizedReturns.Source).Single().Body.Trim() == "return 7;",
     "Redundant trailing bare return was not removed.");
@@ -404,7 +404,7 @@ Assert(validStateCloseRepair.Repairs.All(item => item.ClosuresRemoved == 0) &&
 Assert(UnrealScriptSourceIndex.ParseFunctions(validStateCloseRepair.Source).Count == 2,
     "A valid state declaration did not survive closure repair.");
 
-string redundantReturnSource = """
+string sourceWithRedundantTrailingReturn = """
 class RedundantReturn extends Object;
 function int GetValue()
 {
@@ -412,7 +412,7 @@ function int GetValue()
     return;
 }
 """;
-var redundantReturnRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(redundantReturnSource);
+var redundantReturnRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceWithRedundantTrailingReturn);
 Assert(redundantReturnRepair.Source.Split("return", StringSplitOptions.None).Length - 1 == 1,
     "A redundant bare return after a value return was not removed.");
 Assert(UnrealScriptSourceIndex.ParseFunctions(redundantReturnRepair.Source).Count == 1,
