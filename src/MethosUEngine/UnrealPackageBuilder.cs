@@ -14,6 +14,7 @@ public sealed class UnrealPackageBuilder
     private readonly List<(string Name, uint Flags)> _newNames = new();
     private readonly List<ImportEntry> _newImports = new();
     private readonly List<PendingExport> _newExports = new();
+    private readonly Dictionary<int, byte[]> _replacements = new();
 
     public UnrealPackageBuilder(UnrealPackageIndex source)
     {
@@ -51,6 +52,15 @@ public sealed class UnrealPackageBuilder
         return -ImportCount;
     }
 
+    /// <summary>Replaces an existing export's serialized payload without moving any other payload.</summary>
+    public void ReplaceExportPayload(int exportReference, byte[] serializedPayload)
+    {
+        ArgumentNullException.ThrowIfNull(serializedPayload);
+        if (exportReference < 1 || exportReference > _source.Exports.Count)
+            throw new ArgumentOutOfRangeException(nameof(exportReference), "Solo se pueden reemplazar exports que ya existen en el paquete original.");
+        _replacements[exportReference] = serializedPayload.ToArray();
+    }
+
     /// <summary>Returns the Unreal object reference (positive export index).</summary>
     public int AddExport(int classReference, int superReference, int outerReference,
         int objectName, uint objectFlags, byte[] serializedPayload)
@@ -69,6 +79,17 @@ public sealed class UnrealPackageBuilder
     {
         using var output = new MemoryStream(checked(_source.OriginalLength + 4096));
         output.Write(_source.CopyOriginalSlice(0, _source.OriginalLength));
+
+        var replacementOffsets = new Dictionary<int, int>();
+        foreach (var replacement in _replacements.OrderBy(item => item.Key))
+        {
+            if (replacement.Value.Length == 0) replacementOffsets[replacement.Key] = 0;
+            else
+            {
+                replacementOffsets[replacement.Key] = checked((int)output.Position);
+                output.Write(replacement.Value);
+            }
+        }
 
         var payloadOffsets = new List<int>(_newExports.Count);
         foreach (var export in _newExports)
@@ -92,10 +113,21 @@ public sealed class UnrealPackageBuilder
         foreach (var import in _newImports) WriteImport(output, import);
 
         int exportOffset = checked((int)output.Position);
-        output.Write(_source.CopyOriginalSlice(_source.Summary.ExportOffset,
-            GetTableLength(_source.Summary.ExportOffset, _source.ExportTableEnd)));
+        for (int i = 0; i < _source.Exports.Count; i++)
+        {
+            int reference = i + 1;
+            ExportEntry entry = _source.Exports[i];
+            if (_replacements.TryGetValue(reference, out byte[]? replacement))
+                entry = entry with { SerialSize = replacement.Length, SerialOffset = replacement.Length == 0 ? 0 : replacementOffsets[reference] };
+            WriteExport(output, entry);
+        }
         for (int i = 0; i < _newExports.Count; i++)
-            WriteExport(output, _newExports[i], payloadOffsets[i]);
+        {
+            var pending = _newExports[i];
+            WriteExport(output, new ExportEntry(pending.ClassReference, pending.SuperReference,
+                pending.OuterReference, pending.ObjectName, pending.ObjectFlags,
+                pending.Payload.Length, payloadOffsets[i]));
+        }
 
         byte[] result = output.ToArray();
         WriteI32(result, 12, NameCount);
@@ -186,15 +218,15 @@ public sealed class UnrealPackageBuilder
         WriteCompact(stream, entry.ObjectName);
     }
 
-    private static void WriteExport(Stream stream, PendingExport entry, int serialOffset)
+    private static void WriteExport(Stream stream, ExportEntry entry)
     {
-        WriteCompact(stream, entry.ClassReference);
-        WriteCompact(stream, entry.SuperReference);
-        WriteI32(stream, entry.OuterReference);
+        WriteCompact(stream, entry.ClassRef);
+        WriteCompact(stream, entry.SuperRef);
+        WriteI32(stream, entry.Outer);
         WriteCompact(stream, entry.ObjectName);
         WriteU32(stream, entry.ObjectFlags);
-        WriteCompact(stream, entry.Payload.Length);
-        if (entry.Payload.Length > 0) WriteCompact(stream, serialOffset);
+        WriteCompact(stream, entry.SerialSize);
+        if (entry.SerialSize > 0) WriteCompact(stream, entry.SerialOffset);
     }
 
     private static void WriteCompact(Stream stream, int value)
