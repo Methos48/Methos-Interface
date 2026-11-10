@@ -259,7 +259,7 @@ public static class UnrealScriptCallsiteArgumentRestorer
                 while (++i < source.Length)
                 {
                     if (source[i] == '\\' && i + 1 < source.Length) { i++; continue; }
-                    if (source[i++] == quote) break;
+                    if (source[i] == quote) break;
                 }
                 continue;
             }
