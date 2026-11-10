@@ -83,6 +83,12 @@ jobs:
           Write-Host "ORIGINAL_INTERFACE_SHA256=$originalHash"
           Write-Host "UCC_REBUILD_EXACT_MATCH=$($generatedHash -eq $originalHash)"
 
+      - name: Ejecutar pruebas unitarias del motor y normalizadores
+        shell: pwsh
+        run: |
+          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas unitarias del motor o los normalizadores." }
+
       - name: Probar el backend UCC integrado en Methos U Engine
         shell: pwsh
         run: |
