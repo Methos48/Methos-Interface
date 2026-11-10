@@ -874,7 +874,8 @@ if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Dire
     }
     Console.WriteLine($"UCC INTERLUDE BYTECODE: exact return-only round trips={uccRoundTrips}; unsupported functions={uccUnsupported}; real package patch={(uccRealPatchPassed ? "PASS" : "not found")}.");
 
-    int sourceMatches = 0, sourceMissing = 0, sourceUnmappedFunctions = 0, sourceDuplicateFunctions = 0;
+    int sourceMatches = 0, sourceMissing = 0, sourceUnmappedFunctions = 0, sourceDuplicateFunctions = 0, sourceParseErrors = 0;
+    var sourceParseErrorExamples = new List<string>();
     var sourceMissingExamples = new List<string>();
     var sourceUnmappedExamples = new List<string>();
     var sourceDuplicateExamples = new List<string>();
@@ -894,8 +895,25 @@ if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Dire
         }
         sourceMatches++;
         string sourceText = File.ReadAllText(sourcePath);
-        var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(
-            UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+        IReadOnlyList<UnrealScriptFunctionSource> sourceFunctions;
+        try
+        {
+            sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(sourceText);
+        }
+        catch (InvalidDataException)
+        {
+            try
+            {
+                sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(
+                    UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+            }
+            catch (InvalidDataException sourceError)
+            {
+                sourceParseErrors++;
+                sourceParseErrorExamples.Add(uccClassName + ": " + sourceError.Message);
+                continue;
+            }
+        }
         var targets = interludeFunctionMap[uccClassName];
         var targetNames = targets.Select(target => target.Name.ToString()).ToArray();
         sourceDuplicateFunctions += targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -907,7 +925,8 @@ if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Dire
         sourceDuplicateExamples.AddRange(targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1).Select(group => uccClassName + "." + group.Key));
     }
-    Console.WriteLine($"UCC SOURCE MAP: classes matched={sourceMatches}/{interludeSourceFiles.Length}; missing classes={sourceMissing}; source functions without target={sourceUnmappedFunctions}; duplicate target names={sourceDuplicateFunctions}.");
+    Console.WriteLine($"UCC SOURCE MAP: classes matched={sourceMatches}/{interludeSourceFiles.Length}; missing classes={sourceMissing}; source parse errors={sourceParseErrors}; source functions without target={sourceUnmappedFunctions}; duplicate target names={sourceDuplicateFunctions}.");
+    Console.WriteLine("UCC SOURCE PARSE ERRORS: " + string.Join(" | ", sourceParseErrorExamples.Take(10)));
     Console.WriteLine("UCC MISSING CLASSES: " + string.Join(", ", sourceMissingExamples.Take(25)));
     Console.WriteLine("UCC UNMAPPED FUNCTIONS: " + string.Join(", ", sourceUnmappedExamples.Take(25)));
     Console.WriteLine("UCC DUPLICATE FUNCTIONS: " + string.Join(", ", sourceDuplicateExamples.Take(25)));
