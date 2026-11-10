@@ -17,7 +17,7 @@ try
     using var package = UnrealLoader.LoadPackage(input, FileAccess.Read);
     Console.WriteLine($"PackageVersion={package.Summary.Version}");
     Console.WriteLine($"LicenseeVersion={package.Summary.LicenseeVersion}");
-    package.InitializePackage(UnrealPackage.InitFlags.Construct | UnrealPackage.InitFlags.RegisterClasses);
+    package.InitializePackage();
 
     var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
     Console.WriteLine($"ObjectCount={package.Objects.Count}");
@@ -28,7 +28,6 @@ try
     {
         try
         {
-            obj.BeginDeserializing();
             var source = obj.Decompile();
             var objectName = obj.Name?.ToString() ?? $"Object_{exported}";
             var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
