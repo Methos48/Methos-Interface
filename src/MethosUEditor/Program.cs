@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using UELib;
+using MethosUEngine;
 using UELib.Core;
 
 namespace MethosUEditor;
@@ -188,6 +189,16 @@ internal sealed class MainForm : Form
         var output = Path.Combine(PartsDir, baseName);
         Directory.CreateDirectory(output);
         Log($"Descompilando {Path.GetFileName(path)}...");
+        try
+        {
+            var index = UnrealPackageIndex.Open(path);
+            Log($"Índice independiente UE2: nombres={index.Summary.NameCount}, imports={index.Summary.ImportCount}, exports={index.Summary.ExportCount}, generaciones={index.Summary.GenerationCount}.");
+        }
+        catch (Exception ex)
+        {
+            // UELib remains the compatibility reader while the native compiler is developed.
+            Log($"Aviso del analizador independiente: {ex.Message}");
+        }
         using var package = UnrealLoader.LoadPackage(path, FileAccess.Read);
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
