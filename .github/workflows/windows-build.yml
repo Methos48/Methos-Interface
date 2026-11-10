@@ -23,7 +23,7 @@ jobs:
       - name: Ejecutar prueba de compatibilidad del paquete
         shell: pwsh
         run: |
-          dotnet run --project tools/PackageProbe/PackageProbe.csproj --configuration Release -- "Interface.u" "probe-export"
+          dotnet run --project tools/PackageProbe/PackageProbe.csproj --configuration Release -- "Interface.u" "probe-export" 2>&1 | Tee-Object -FilePath probe-log.txt
         continue-on-error: true
 
       - name: Guardar resultado de UELib
@@ -31,7 +31,7 @@ jobs:
         if: always()
         with:
           name: methos-u-uelib-probe
-          path: probe-export/
+          path: |\n            probe-export/\n            probe-log.txt
           if-no-files-found: ignore
 
       - name: Analizar archivos fuente
