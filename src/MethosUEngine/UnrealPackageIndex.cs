@@ -208,6 +208,8 @@ public sealed class UnrealPackageIndex
         return checked((int)value);
     }
 
+    public static int DecodeCompactIndex(byte[] data, ref int position) => ReadCompact(data, ref position);
+
     private static int ReadCompact(byte[] data, ref int position)
     {
         RequireRange(data, position, 1, "índice compacto");
@@ -219,10 +221,16 @@ public sealed class UnrealPackageIndex
         int bytes = 1;
         while (more)
         {
-            if (bytes++ >= 5) throw new InvalidDataException("Índice compacto demasiado largo.");
+            if (bytes >= 5) throw new InvalidDataException("Índice compacto demasiado largo.");
             RequireRange(data, position, 1, "índice compacto");
             byte next = data[position++];
-            value |= (uint)(next & 0x7F) << shift;
+            bool fifthByte = bytes == 4;
+            if (fifthByte && (next & 0xF0) != 0)
+                throw new InvalidDataException("El quinto byte del índice compacto contiene bits reservados.");
+            value |= (uint)(next & (fifthByte ? 0x0F : 0x7F)) << shift;
+            bytes++;
+            if (fifthByte && (next & 0x80) != 0)
+                throw new InvalidDataException("El índice compacto continúa después del quinto byte.");
             shift += 7;
             more = (next & 0x80) != 0;
         }
