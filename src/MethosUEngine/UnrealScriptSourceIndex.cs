@@ -351,11 +351,17 @@ public static class UnrealScriptSourceIndex
                 tokens[previousReturn + 1].Text == ";")
                 continue;
 
+            // A return is conditional only when its own statement is directly controlled
+            // by a branch/loop without a closing block between the control keyword and return.
+            // Earlier completed if/loop blocks must not prevent removal of a later unreachable return.
             bool conditionalReturn = false;
-            for (int i = 0; i < previousReturn; i++)
+            int statementStart = previousReturn - 1;
+            while (statementStart >= 0 &&
+                   tokens[statementStart].Text is not ";" and not "{" and not "}")
+                statementStart--;
+            for (int i = statementStart + 1; i < previousReturn; i++)
             {
-                if (depths[i] == depths[previousReturn] &&
-                    tokens[i].Kind == TokenKind.Identifier &&
+                if (tokens[i].Kind == TokenKind.Identifier &&
                     tokens[i].Text is "if" or "else" or "switch" or "while" or "for" or "foreach" or "do")
                 {
                     conditionalReturn = true;
