@@ -203,7 +203,9 @@ var nativeOperators = new[]
     new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 10),
     new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 20),
     new UnrealScriptNativeFunction(0x72, "-", UnrealScriptNativeFunctionKind.PreOperator, 30),
-    new UnrealScriptNativeFunction(0x73, "++", UnrealScriptNativeFunctionKind.PostOperator, 30)
+    new UnrealScriptNativeFunction(0x73, "++", UnrealScriptNativeFunctionKind.PostOperator, 30),
+    new UnrealScriptNativeFunction(0x74, "Abs", UnrealScriptNativeFunctionKind.Function),
+    new UnrealScriptNativeFunction(0x75, "Max", UnrealScriptNativeFunctionKind.Function)
 };
 byte[] nativeOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return A + 1;",
     variableResolver: _ => new UnrealScriptVariableReference(0x00, 12),
@@ -237,6 +239,24 @@ Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(postfixOperatorCode,
     objectResolver: reference => reference == 12 ? "A" : throw new InvalidDataException(),
     nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return A++;",
     "Native postfix operator source/bytecode round trip failed.");
+byte[] groupedOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return (A + B) * 2;",
+    variableResolver: name => new UnrealScriptVariableReference(0x00, name == "A" ? 12 : 13),
+    nativeFunctions: nativeOperators);
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(groupedOperatorCode,
+    objectResolver: reference => reference switch { 12 => "A", 13 => "B", _ => throw new InvalidDataException() },
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return (A + B) * 2;",
+    "Native operator parentheses were not preserved.");
+byte[] nativeCallCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return Max(A, B);",
+    variableResolver: name => new UnrealScriptVariableReference(0x00, name == "A" ? 12 : 13),
+    nativeFunctions: nativeOperators);
+Assert(nativeCallCode.SequenceEqual(new byte[]
+{
+    0x04, 0x75, 0x00, 12, 0, 0, 0, 0x00, 13, 0, 0, 0, 0x16, 0x47
+}), "Native function call bytecode is incorrect.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(nativeCallCode,
+    objectResolver: reference => reference switch { 12 => "A", 13 => "B", _ => throw new InvalidDataException() },
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return Max(A, B);",
+    "Native function call source/bytecode round trip failed.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
     "Native compilation modified the original package bytes.");
