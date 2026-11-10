@@ -125,6 +125,31 @@ if (args.Length >= 4 && args[0] == "--ucc-compile")
     return;
 }
 
+if (args.Length >= 3 && args[0] == "--normalize-sources")
+{
+    string runtimeRoot = args[1];
+    string sourceDirectory = args[2];
+    string registryPath = Path.Combine(runtimeRoot, "native-function-registry.json");
+    var registry = NativeFunctionRegistryBuilder.Build(runtimeRoot, registryPath);
+    int totalNormalized = 0, totalUnresolved = 0, filesChanged = 0;
+    foreach (string sourcePath in Directory.GetFiles(sourceDirectory, "*.uc", SearchOption.AllDirectories))
+    {
+        string sourceText = File.ReadAllText(sourcePath);
+        string normalized = UnrealScriptNativeFunctionNormalizer.Normalize(
+            sourceText, registryPath, out int normalizedCount, out int unresolvedCount);
+        totalNormalized += normalizedCount;
+        totalUnresolved += unresolvedCount;
+        if (!string.Equals(sourceText, normalized, StringComparison.Ordinal))
+        {
+            File.WriteAllText(sourcePath, normalized, new System.Text.UnicodeEncoding(false, true));
+            filesChanged++;
+        }
+    }
+    Console.WriteLine($"NATIVE REGISTRY: {registry.Count} functions.");
+    Console.WriteLine($"NATIVE SOURCE NORMALIZATION: files changed={filesChanged}; wrappers normalized={totalNormalized}; unresolved wrappers={totalUnresolved}.");
+    return;
+}
+
 if (args.Length >= 3 && args[0] == "--export-sources")
 {
     string packagePath = args[1];
