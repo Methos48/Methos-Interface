@@ -19,6 +19,9 @@ public static class UnrealScriptFunctionCompiler
     private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
     private const byte EX_Let = 0x0F;
+    private const byte EX_EndFunctionParms = 0x16;
+    private const byte EX_ExtendedNative = 0x60;
+    private const byte EX_FirstNative = 0x70;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
     private const byte EX_StringConst = 0x1F;
@@ -42,7 +45,8 @@ public static class UnrealScriptFunctionCompiler
         RegexOptions.CultureInvariant);
 
     public static byte[] CompileReturnOnlyBody(string body, Func<string, int>? nameIndexResolver = null,
-        Func<string, UnrealScriptVariableReference>? variableResolver = null)
+        Func<string, UnrealScriptVariableReference>? variableResolver = null,
+        IReadOnlyCollection<UnrealScriptNativeFunction>? nativeFunctions = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         string clean = StripComments(body).Trim();
@@ -67,7 +71,7 @@ public static class UnrealScriptFunctionCompiler
             if (statement.StartsWith("return ", StringComparison.OrdinalIgnoreCase))
             {
                 output.WriteByte(EX_Return);
-                WriteLiteral(output, statement[7..].Trim(), nameIndexResolver, variableResolver);
+                WriteExpression(output, statement[7..].Trim(), nameIndexResolver, variableResolver, nativeFunctions);
                 sawReturn = true;
                 continue;
             }
@@ -86,7 +90,7 @@ public static class UnrealScriptFunctionCompiler
             output.WriteByte(EX_Let);
             output.WriteByte(variable.Token);
             WriteInt32(output, variable.ObjectReference);
-            WriteLiteral(output, right, nameIndexResolver, variableResolver);
+            WriteExpression(output, right, nameIndexResolver, variableResolver, nativeFunctions);
         }
 
         if (!sawReturn)
@@ -145,6 +149,82 @@ public static class UnrealScriptFunctionCompiler
             return i;
         }
         return -1;
+    }
+
+    private static void WriteExpression(Stream output, string expression, Func<string, int>? nameIndexResolver,
+        Func<string, UnrealScriptVariableReference>? variableResolver,
+        IReadOnlyCollection<UnrealScriptNativeFunction>? nativeFunctions)
+    {
+        if (TryWriteNativeOperator(output, expression, nameIndexResolver, variableResolver, nativeFunctions))
+            return;
+        WriteLiteral(output, expression, nameIndexResolver, variableResolver);
+    }
+
+    private static bool TryWriteNativeOperator(Stream output, string expression,
+        Func<string, int>? nameIndexResolver,
+        Func<string, UnrealScriptVariableReference>? variableResolver,
+        IReadOnlyCollection<UnrealScriptNativeFunction>? nativeFunctions)
+    {
+        if (nativeFunctions == null || nativeFunctions.Count == 0) return false;
+        var candidates = new List<(int Position, UnrealScriptNativeFunction Native)>();
+        char quote = '\0';
+        int depth = 0;
+        for (int i = 0; i < expression.Length; i++)
+        {
+            char c = expression[i];
+            if (quote != '\0')
+            {
+                if (c == '\\\\' && i + 1 < expression.Length) { i++; continue; }
+                if (c == quote) quote = '\0';
+                continue;
+            }
+            if (c is '"' or '\'') { quote = c; continue; }
+            if (c == '(') { depth++; continue; }
+            if (c == ')') { depth--; continue; }
+            if (depth != 0) continue;
+
+            foreach (var native in nativeFunctions.Where(item => item.Kind == UnrealScriptNativeFunctionKind.Operator)
+                         .OrderByDescending(item => item.Name.Length))
+            {
+                if (native.Name.Length == 0 || i + native.Name.Length > expression.Length) continue;
+                if (!expression.AsSpan(i, native.Name.Length).SequenceEqual(native.Name.AsSpan())) continue;
+                if ((native.Name is "+" or "-") && i == 0) continue;
+                if (native.Name.All(char.IsLetter) &&
+                    ((i > 0 && (char.IsLetterOrDigit(expression[i - 1]) || expression[i - 1] == '_')) ||
+                     (i + native.Name.Length < expression.Length &&
+                      (char.IsLetterOrDigit(expression[i + native.Name.Length]) || expression[i + native.Name.Length] == '_'))))
+                    continue;
+                candidates.Add((i, native));
+                i += native.Name.Length - 1;
+                break;
+            }
+        }
+
+        if (candidates.Count == 0) return false;
+        var selected = candidates.OrderBy(item => item.Native.Precedence)
+            .ThenByDescending(item => item.Position).First();
+        string left = expression[..selected.Position].Trim();
+        string right = expression[(selected.Position + selected.Native.Name.Length)..].Trim();
+        if (left.Length == 0 || right.Length == 0) return false;
+
+        WriteNativeToken(output, selected.Native.Token);
+        WriteExpression(output, left, nameIndexResolver, variableResolver, nativeFunctions);
+        WriteExpression(output, right, nameIndexResolver, variableResolver, nativeFunctions);
+        output.WriteByte(EX_EndFunctionParms);
+        return true;
+    }
+
+    private static void WriteNativeToken(Stream output, ushort token)
+    {
+        if (token < EX_FirstNative || token >= 0x1000)
+            throw new InvalidDataException($"Índice de función nativa fuera de rango UE2: 0x{token:X}.");
+        if (token < 0x100)
+        {
+            output.WriteByte((byte)token);
+            return;
+        }
+        output.WriteByte((byte)(EX_ExtendedNative + (token >> 8)));
+        output.WriteByte((byte)(token & 0xFF));
     }
 
     private static void WriteLiteral(Stream output, string expression, Func<string, int>? nameIndexResolver,
