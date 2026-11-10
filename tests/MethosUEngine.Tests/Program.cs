@@ -333,8 +333,8 @@ Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 1.5f;")
 Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"界\";")
     .SequenceEqual(new byte[] { 0x04, 0x34, 0x4C, 0x75, 0, 0, 0x47 }), "Unicode string return bytecode is incorrect.");
 byte[] pathLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "..\\L2text\\";""");
-byte[] quoteLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "\"";""");
-Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(quoteLiteralCode) == """return "\"";""",
+byte[] quoteLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"\"\";");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(quoteLiteralCode) == "return \"\"\";",
     "Triple-quote string literal was not preserved.");
 Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(pathLiteralCode) == """return "..\\L2text\\";""",
     "A trailing path backslash was not preserved in string bytecode.");
@@ -391,6 +391,9 @@ var escapedQuoteRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(e
 Assert(escapedQuoteRepair.StringEscapesRepaired == 0 &&
     UnrealScriptSourceIndex.ParseFunctions(escapedQuoteRepair.Source).Count == 1,
     "A valid escaped quote was modified or mis-scanned.");
+string tripleQuoteSource = "class Sample; function TripleQuoteTest() { Call(\"\"\" ); }";
+Assert(UnrealScriptSourceIndex.ParseFunctions(tripleQuoteSource).Count == 1,
+    "Lineage II triple-quote string notation confused the source scanner.");
 
 string malformedTrailingSlashSource = """class Sample; function PathTest() { Call("..\REPLAY\"); }""";
 var trailingSlashRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(malformedTrailingSlashSource);
