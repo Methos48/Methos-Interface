@@ -132,7 +132,7 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
     string referenceDirectory = args[3];
     string registryPath = Path.Combine(runtimeRoot, "native-function-registry.json");
     var registry = NativeFunctionRegistryBuilder.Build(runtimeRoot, registryPath);
-    int totalNormalized = 0, totalUnresolved = 0, filesChanged = 0;
+    int totalNormalized = 0, totalUnresolved = 0, filesChanged = 0, totalSwitchDiagnosticsRemoved = 0;
     foreach (string sourcePath in Directory.GetFiles(sourceDirectory, "*.uc", SearchOption.AllDirectories))
     {
         string sourceText = File.ReadAllText(sourcePath);
@@ -191,6 +191,18 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
                     Console.WriteLine("UICommonAPI SOUND CALL: " + line.Trim());
             }
         }
+        normalized = UnrealScriptDecompilerDiagnosticCleaner.RemoveOrphanedSwitchDiagnostics(
+            normalized, out int removedSwitchDiagnostics);
+        totalSwitchDiagnosticsRemoved += removedSwitchDiagnostics;
+        string className = Path.GetFileNameWithoutExtension(sourcePath);
+        if (className.Equals("AutoBuffWnd", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("AutoPotionsWnd", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("AutoSkillWnd", StringComparison.OrdinalIgnoreCase))
+        {
+            if (normalized.Contains("Failed to format", StringComparison.OrdinalIgnoreCase))
+                throw new Exception($"UELib switch diagnostics remain in {className}.uc after cleanup.");
+            Console.WriteLine($"{className} SWITCH FORMAT DIAGNOSTICS REMOVED: {removedSwitchDiagnostics}.");
+        }
         if (!string.Equals(sourceText, normalized, StringComparison.Ordinal))
         {
             File.WriteAllText(sourcePath, normalized, new System.Text.UnicodeEncoding(false, true));
@@ -198,7 +210,7 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
         }
     }
     Console.WriteLine($"NATIVE REGISTRY: {registry.Count} functions.");
-    Console.WriteLine($"NATIVE SOURCE NORMALIZATION: files changed={filesChanged}; wrappers normalized={totalNormalized}; unresolved wrappers={totalUnresolved}.");
+    Console.WriteLine($"NATIVE SOURCE NORMALIZATION: files changed={filesChanged}; wrappers normalized={totalNormalized}; unresolved wrappers={totalUnresolved}; orphaned switch diagnostics removed={totalSwitchDiagnosticsRemoved}.");
     return;
 }
 
