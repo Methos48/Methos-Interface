@@ -295,7 +295,7 @@ internal sealed class MainForm : Form
                             if (repairedTrailingReturns.Count > 0)
                                 Log($"Retornos vacíos de funciones no-void corregidos: {safeName}.uc; funciones={string.Join(", ", repairedTrailingReturns)}.");
                             if (restoredFunctions.Count > 0)
-                                Log($"Funciones que UELib no pudo descompilar, recuperadas de la referencia: {safeName}.uc; funciones={restoredFunctions.Count}.");
+                                Log($"Funciones dañadas o excesivamente anidadas, recuperadas de la referencia: {safeName}.uc; funciones={restoredFunctions.Count}.");
                             source = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                                 source, referenceSource, out int restoredEnumArguments);
                             if (restoredEnumArguments > 0)
