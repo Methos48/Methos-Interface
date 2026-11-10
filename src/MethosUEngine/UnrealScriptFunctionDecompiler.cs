@@ -15,6 +15,9 @@ public static class UnrealScriptFunctionDecompiler
     private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
     private const byte EX_Let = 0x0F;
+    private const byte EX_EndFunctionParms = 0x16;
+    private const byte EX_ExtendedNative = 0x60;
+    private const byte EX_FirstNative = 0x70;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
     private const byte EX_StringConst = 0x1F;
@@ -30,7 +33,8 @@ public static class UnrealScriptFunctionDecompiler
     private const byte EX_EndOfScript = 0x47;
 
     public static string DecompileReturnOnly(byte[] bytecode,
-        Func<int, string>? nameResolver = null, Func<int, string>? objectResolver = null)
+        Func<int, string>? nameResolver = null, Func<int, string>? objectResolver = null,
+        Func<ushort, UnrealScriptNativeFunction?>? nativeResolver = null)
     {
         ArgumentNullException.ThrowIfNull(bytecode);
         if (bytecode.Length < 2 || bytecode[^1] != EX_EndOfScript)
@@ -58,13 +62,13 @@ public static class UnrealScriptFunctionDecompiler
             }
             else if (token == EX_Return)
             {
-                string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
                 statements.Add($"return {expression};");
                 sawReturn = true;
             }
             else if (token == EX_Let)
             {
-                string left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                string left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
                 string right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
                 statements.Add($"{left} = {right};");
             }
@@ -80,7 +84,8 @@ public static class UnrealScriptFunctionDecompiler
     }
 
     public static string DecompileExport(UnrealPackageIndex package, int exportReference,
-        int scriptOffsetRelative, int scriptSize, Func<int, string>? objectResolver = null)
+        int scriptOffsetRelative, int scriptSize, Func<int, string>? objectResolver = null,
+        Func<ushort, UnrealScriptNativeFunction?>? nativeResolver = null)
     {
         ArgumentNullException.ThrowIfNull(package);
         if (exportReference < 1 || exportReference > package.Exports.Count)
@@ -102,13 +107,15 @@ public static class UnrealScriptFunctionDecompiler
             if (index < 0 || index >= package.Names.Count)
                 throw new InvalidDataException($"Índice de nombre inválido en bytecode: {index}.");
             return package.Names[index];
-        }, objectResolver ?? package.ResolveObjectName);
+        }, objectResolver ?? package.ResolveObjectName, nativeResolver);
     }
 
     private static string ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver,
-        Func<int, string>? objectResolver)
+        Func<int, string>? objectResolver, Func<ushort, UnrealScriptNativeFunction?>? nativeResolver)
     {
         byte token = ReadByte(data, ref position);
+        if (token >= EX_FirstNative || token >= EX_ExtendedNative && token < EX_FirstNative)
+            return ReadNativeExpression(data, ref position, token, nameResolver, objectResolver, nativeResolver);
         switch (token)
         {
             case EX_LocalVariable:
@@ -148,6 +155,68 @@ public static class UnrealScriptFunctionDecompiler
             default:
                 throw new NotSupportedException($"Expresión de bytecode no admitida: 0x{token:X2}.");
         }
+    }
+
+    private static string ReadNativeExpression(byte[] data, ref int position, byte firstToken,
+        Func<int, string>? nameResolver, Func<int, string>? objectResolver,
+        Func<ushort, UnrealScriptNativeFunction?>? nativeResolver)
+    {
+        ushort token = firstToken >= EX_FirstNative
+            ? firstToken
+            : (ushort)(((firstToken - EX_ExtendedNative) << 8) | ReadByte(data, ref position));
+        var native = nativeResolver?.Invoke(token)
+            ?? throw new NotSupportedException($"No hay metadatos para la función nativa 0x{token:X}.");
+        string result;
+        switch (native.Kind)
+        {
+            case UnrealScriptNativeFunctionKind.Operator:
+            {
+                string left = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                string right = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                ExpectEndFunctionParms(data, ref position);
+                result = $"{left} {native.Name} {right}";
+                break;
+            }
+            case UnrealScriptNativeFunctionKind.PreOperator:
+            {
+                string operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                ExpectEndFunctionParms(data, ref position);
+                result = native.Name.All(char.IsLetter) ? native.Name + " " + operand : native.Name + operand;
+                break;
+            }
+            case UnrealScriptNativeFunctionKind.PostOperator:
+            {
+                string operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                ExpectEndFunctionParms(data, ref position);
+                result = native.Name.All(char.IsLetter) ? operand + " " + native.Name : operand + native.Name;
+                break;
+            }
+            case UnrealScriptNativeFunctionKind.Function:
+            {
+                var arguments = new List<string>();
+                while (true)
+                {
+                    if (position >= data.Length) throw new InvalidDataException("Llamada nativa sin EndFunctionParms.");
+                    if (data[position] == EX_EndFunctionParms)
+                    {
+                        position++;
+                        break;
+                    }
+                    arguments.Add(ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver));
+                }
+                result = $"{native.Name}({string.Join(", ", arguments)})";
+                break;
+            }
+            default:
+                throw new NotSupportedException($"Tipo de función nativa no admitido para 0x{token:X}.");
+        }
+        return result;
+    }
+
+    private static void ExpectEndFunctionParms(byte[] data, ref int position)
+    {
+        if (ReadByte(data, ref position) != EX_EndFunctionParms)
+            throw new InvalidDataException("La expresión nativa no termina con EndFunctionParms.");
     }
 
     private static string ReadAnsiString(byte[] data, ref int position)
