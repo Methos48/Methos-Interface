@@ -152,8 +152,7 @@ public static class UnrealScriptSourceIndex
             else if (repairedTokens[i].Text == "}")
             {
                 if (globalDepth > 0) globalDepth--;
-                else if (i + 1 == repairedTokens.Count || IsDeclarationBoundary(repairedTokens, i + 1))
-                    orphanClosures.Add((repairedTokens[i].Start, repairedTokens[i].Line));
+                else orphanClosures.Add((repairedTokens[i].Start, repairedTokens[i].Line));
             }
         }
         foreach (var orphan in orphanClosures.OrderByDescending(item => item.Offset))
