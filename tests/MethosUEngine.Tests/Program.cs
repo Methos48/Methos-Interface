@@ -70,6 +70,23 @@ static byte[] BuildFixture()
     return bytes;
 }
 
+foreach (int sample in new[] { 0, 1, -1, 63, 64, -64, 8191, 8192, int.MaxValue, -int.MaxValue })
+{
+    byte[] encoded = Compact(sample);
+    int cursor = 0;
+    int decoded = UnrealPackageIndex.DecodeCompactIndex(encoded, ref cursor);
+    Assert(decoded == sample && cursor == encoded.Length, $"Compact index mismatch for {sample}.");
+}
+
+bool rejectedMalformed = false;
+try
+{
+    int cursor = 0;
+    UnrealPackageIndex.DecodeCompactIndex(new byte[] { 0x40, 0x80, 0x80, 0x80, 0x80 }, ref cursor);
+}
+catch (InvalidDataException) { rejectedMalformed = true; }
+Assert(rejectedMalformed, "Malformed five-byte compact index was accepted.");
+
 byte[] fixture = BuildFixture();
 var parsed = UnrealPackageIndex.Parse(fixture);
 Assert(parsed.Summary.Version == 126 && parsed.Summary.LicenseeVersion == 0, "Version profile mismatch.");
