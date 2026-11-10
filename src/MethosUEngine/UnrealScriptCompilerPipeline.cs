@@ -3,7 +3,8 @@ namespace MethosUEngine;
 public sealed record UnrealFunctionTarget(string Name, int ExportReference,
     int ScriptOffsetRelative, int OriginalScriptSize);
 
-public sealed record UnrealScriptCompileResult(byte[] PackageBytes, int FunctionsCompiled);
+public sealed record UnrealScriptCompileResult(byte[] PackageBytes, int FunctionsCompiled,
+    IReadOnlyList<UnrealScriptSourceIndex.ClosureRepair> Repairs);
 
 /// <summary>
 /// Connects source indexing, literal-return bytecode generation, bytecode patching
@@ -12,7 +13,8 @@ public sealed record UnrealScriptCompileResult(byte[] PackageBytes, int Function
 public static class UnrealScriptCompilerPipeline
 {
     public static UnrealScriptCompileResult CompileClassSource(string source,
-        UnrealPackageIndex package, IReadOnlyCollection<UnrealFunctionTarget> targets)
+        UnrealPackageIndex package, IReadOnlyCollection<UnrealFunctionTarget> targets,
+        bool repairMissingFunctionClosures = true)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(package);
@@ -28,7 +30,11 @@ public static class UnrealScriptCompilerPipeline
                 throw new InvalidDataException($"Hay más de un destino de compilación para la función '{target.Name}'.");
         }
 
-        var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(source);
+        var repairResult = repairMissingFunctionClosures
+            ? UnrealScriptSourceIndex.RepairMissingFunctionClosures(source)
+            : new UnrealScriptSourceIndex.ClosureRepairResult(source,
+                Array.Empty<UnrealScriptSourceIndex.ClosureRepair>());
+        var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(repairResult.Source);
         var builder = new UnrealPackageBuilder(package);
         int compiled = 0;
         var usedTargets = new HashSet<int>();
@@ -51,6 +57,6 @@ public static class UnrealScriptCompilerPipeline
         if (compiled == 0)
             throw new InvalidDataException("No se encontraron cuerpos de función compilables en el archivo .uc.");
 
-        return new UnrealScriptCompileResult(builder.Build(), compiled);
+        return new UnrealScriptCompileResult(builder.Build(), compiled, repairResult.Repairs);
     }
 }
