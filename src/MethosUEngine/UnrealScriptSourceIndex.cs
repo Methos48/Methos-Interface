@@ -101,9 +101,15 @@ public static class UnrealScriptSourceIndex
             var header = headers[h];
             if (header.BodyOpenIndex < 0) continue;
 
-            int boundary = h + 1 < headers.Count
-                ? tokens[headers[h + 1].KeywordIndex].Start
-                : source.Length;
+            int boundary = source.Length;
+            for (int tokenIndex = header.BodyOpenIndex + 1; tokenIndex < tokens.Count; tokenIndex++)
+            {
+                if (IsDeclarationBoundary(tokens[tokenIndex]))
+                {
+                    boundary = tokens[tokenIndex].Start;
+                    break;
+                }
+            }
             int depth = 0;
             bool closed = false;
 
@@ -136,6 +142,21 @@ public static class UnrealScriptSourceIndex
         _ = ParseFunctions(repaired);
         repairs.Reverse();
         return new ClosureRepairResult(repaired, repairs);
+    }
+
+    private static bool IsDeclarationBoundary(Token token)
+    {
+        if (token.Kind != TokenKind.Identifier) return false;
+        return token.Text.Equals("function", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("event", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("state", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("defaultproperties", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("replication", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("var", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("struct", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("enum", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("const", StringComparison.OrdinalIgnoreCase) ||
+               token.Text.Equals("cpptext", StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed record FunctionHeader(int KeywordIndex, int BodyOpenIndex, string Name, int Line);
