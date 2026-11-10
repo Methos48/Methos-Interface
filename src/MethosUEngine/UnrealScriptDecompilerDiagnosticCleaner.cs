@@ -16,12 +16,13 @@ public static class UnrealScriptDecompilerDiagnosticCleaner
     public static string RemoveOrphanedSwitchDiagnostics(string source, out int removedLines)
     {
         ArgumentNullException.ThrowIfNull(source);
-        removedLines = 0;
+        int count = 0;
         string result = DiagnosticLine.Replace(source, _ =>
         {
-            removedLines++;
+            count++;
             return string.Empty;
         });
+        removedLines = count;
         return result;
     }
 }
