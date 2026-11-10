@@ -398,8 +398,8 @@ if (args.Length > 1)
     int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
     foreach (var entry in sourceFiles)
     {
-        string className = Path.GetFileNameWithoutExtension(entry.Name);
-        if (!sourceClasses.TryGetValue(className, out var classObject))
+        string sourceClassName = Path.GetFileNameWithoutExtension(entry.Name);
+        if (!sourceClasses.TryGetValue(sourceClassName, out var classObject))
         {
             missingClassFiles++;
             continue;
