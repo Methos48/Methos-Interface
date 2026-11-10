@@ -46,6 +46,34 @@ public static class UnrealScriptFailedFunctionRepair
     private static Dictionary<string, FunctionBlock> ReadFunctions(string source)
     {
         var result = new Dictionary<string, FunctionBlock>(StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<UnrealFunctionSource> functions;
+        try
+        {
+            functions = UnrealScriptSourceIndex.ParseFunctions(source);
+        }
+        catch (InvalidDataException)
+        {
+            return ReadFunctionsLegacy(source);
+        }
+
+        foreach (var function in functions)
+        {
+            int lineStart = source.LastIndexOf('\n', Math.Max(0, function.DeclarationOffset - 1));
+            lineStart = lineStart < 0 ? 0 : lineStart + 1;
+            int start = lineStart;
+            while (start < function.DeclarationOffset && char.IsWhiteSpace(source[start])) start++;
+
+            int end = function.BodyOffset + function.BodyLength + 1;
+            if (end > source.Length || end <= start) continue;
+            result[function.Name] = new FunctionBlock(function.Name, start, end - start,
+                source[start..end], source.Substring(function.BodyOffset, function.BodyLength));
+        }
+        return result;
+    }
+
+    private static Dictionary<string, FunctionBlock> ReadFunctionsLegacy(string source)
+    {
+        var result = new Dictionary<string, FunctionBlock>(StringComparer.OrdinalIgnoreCase);
         foreach (Match match in FunctionHeader.Matches(source))
         {
             int openBrace = source.IndexOf('{', match.Index + match.Length - 1);
