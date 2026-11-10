@@ -107,6 +107,19 @@ Assert(reparsed.Exports.SequenceEqual(parsed.Exports), "Exports changed after ro
 Assert(rebuilt.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }), "Opaque object payload moved or changed.");
 Assert(rebuilt.Length > fixture.Length, "Round-trip tables were not appended.");
 
+byte[] originalFunctionPayload = { 0xAA, 0xBB, 3, 0, 0, 0, 0x10, 0x20, 0x30, 0xCC, 0xDD };
+byte[] newFunctionCode = { 0x99, 0x88 };
+byte[] patchedFunctionPayload = UnrealScriptPatcher.ReplaceBytecode(
+    originalFunctionPayload, 126, 6, 3, newFunctionCode);
+Assert(patchedFunctionPayload.AsSpan(0, 2).SequenceEqual(new byte[] { 0xAA, 0xBB }),
+    "Function prefix changed during bytecode replacement.");
+Assert(BinaryPrimitives.ReadInt32LittleEndian(patchedFunctionPayload.AsSpan(2, 4)) == 2,
+    "Function bytecode size was not updated.");
+Assert(patchedFunctionPayload.AsSpan(6, 2).SequenceEqual(newFunctionCode),
+    "Function bytecode was not replaced.");
+Assert(patchedFunctionPayload.AsSpan(8).SequenceEqual(new byte[] { 0xCC, 0xDD }),
+    "Function suffix changed during bytecode replacement.");
+
 var replacementBuilder = new UnrealPackageBuilder(parsed);
 byte[] replacementPayload = { 0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x02 };
 replacementBuilder.ReplaceExportPayload(1, replacementPayload);
