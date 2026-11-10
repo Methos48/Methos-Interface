@@ -61,6 +61,14 @@ jobs:
           if ($count -lt 150) { throw "Se exportaron muy pocas clases ($count)." }
           Write-Host "Fuentes extraídas del Interface.u real: $count clases."
 
+      - name: Guardar fuentes generadas por el descompilador para diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-u-decompiled-interface-sources
+          path: ucc-validation/Compilador  U/Interlude/Interface/Classes/*.uc
+          if-no-files-found: warn
+
       - name: Recompilar las fuentes extraídas del Interface.u real con UCC
         shell: pwsh
         run: |
