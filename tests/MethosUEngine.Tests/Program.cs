@@ -385,6 +385,10 @@ string conditionalReturnSource = "class ReturnTest; function int GetValue(bool b
 var conditionalReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(conditionalReturnSource);
 Assert(conditionalReturns.Repairs.Count == 0,
     "A conditional return was incorrectly treated as unreachable.");
+string completedBranchThenReturn = "class ReturnTest; function string GetValue(bool b) { if (b) { Log(\"branch\"); } return \"value\"; return; }";
+var completedBranchReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(completedBranchThenReturn);
+Assert(completedBranchReturns.Repairs.Count == 1,
+    "A completed if block incorrectly prevented removal of a later unreachable return.");
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
