@@ -35,7 +35,7 @@ public static class UnrealScriptCompilerPipeline
         var repairResult = repairMissingFunctionClosures
             ? UnrealScriptSourceIndex.RepairMissingFunctionClosures(source)
             : new UnrealScriptSourceIndex.ClosureRepairResult(source,
-                Array.Empty<UnrealScriptSourceIndex.ClosureRepair>());
+                Array.Empty<UnrealScriptSourceIndex.ClosureRepair>(), 0);
         var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(repairResult.Source);
         var builder = new UnrealPackageBuilder(package);
         int compiled = 0;
