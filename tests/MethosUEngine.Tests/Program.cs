@@ -136,10 +136,12 @@ var parsed = UnrealPackageIndex.Parse(fixture);
 byte[] functionFixture = BuildFunctionFixture();
 var functionPackage = UnrealPackageIndex.Parse(functionFixture);
 var compileResult = UnrealScriptCompilerPipeline.CompileClassSource(
-    "class TestFunc extends Object; function int TestFunc() { return 5; }",
+    "class TestFunc extends Object; function int TestFunc() { return 5;",
     functionPackage,
     new[] { new UnrealFunctionTarget("TestFunc", 1, 6, 2) });
 Assert(compileResult.FunctionsCompiled == 1, "Native compiler did not compile the function.");
+Assert(compileResult.Repairs.Count == 1 && compileResult.Repairs[0].ClosuresInserted == 1,
+    "Native compiler did not report its source-closure repair.");
 var compiledPackage = UnrealPackageIndex.Parse(compileResult.PackageBytes);
 var compiledExport = compiledPackage.Exports[0];
 byte[] compiledPayload = compileResult.PackageBytes.AsSpan(
