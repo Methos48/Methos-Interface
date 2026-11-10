@@ -161,8 +161,6 @@ public static class UnrealScriptSourceIndex
             repairs.Add(new ClosureRepair("orphan", orphan.Line, 0, 1));
         }
 
-        repaired = RemoveRedundantTrailingReturns(repaired).Source;
-
         // Fail closed if the repaired copy is still structurally incomplete.
         _ = ParseFunctions(repaired);
         repairs.Reverse();
