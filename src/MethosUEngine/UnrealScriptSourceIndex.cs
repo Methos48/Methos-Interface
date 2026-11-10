@@ -104,7 +104,7 @@ public static class UnrealScriptSourceIndex
             int boundary = source.Length;
             for (int tokenIndex = header.BodyOpenIndex + 1; tokenIndex < tokens.Count; tokenIndex++)
             {
-                if (IsDeclarationBoundary(tokens[tokenIndex]))
+                if (IsDeclarationBoundary(tokens, tokenIndex))
                 {
                     boundary = tokens[tokenIndex].Start;
                     break;
@@ -144,19 +144,97 @@ public static class UnrealScriptSourceIndex
         return new ClosureRepairResult(repaired, repairs);
     }
 
-    private static bool IsDeclarationBoundary(Token token)
+    private static bool IsDeclarationBoundary(IReadOnlyList<Token> tokens, int index)
     {
+        Token token = tokens[index];
         if (token.Kind != TokenKind.Identifier) return false;
-        return token.Text.Equals("function", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("event", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("state", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("defaultproperties", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("replication", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("var", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("struct", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("enum", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("const", StringComparison.OrdinalIgnoreCase) ||
-               token.Text.Equals("cpptext", StringComparison.OrdinalIgnoreCase);
+
+        bool Is(string value, int at) =>
+            at >= 0 && at < tokens.Count &&
+            tokens[at].Text.Equals(value, StringComparison.OrdinalIgnoreCase);
+
+        bool HasOpeningBraceBeforeTerminator(int start)
+        {
+            for (int i = start; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == "{") return true;
+                if (tokens[i].Text is ";" or "}") return false;
+            }
+            return false;
+        }
+
+        if (Is("function", index) || Is("event", index))
+        {
+            int open = -1;
+            for (int i = index + 1; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == "(") { open = i; break; }
+                if (tokens[i].Text is ";" or "{" or "}") return false;
+            }
+            if (open <= index + 1) return false;
+            int depth = 0;
+            for (int i = open; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == "(") depth++;
+                else if (tokens[i].Text == ")" && --depth == 0)
+                    return HasOpeningBraceBeforeTerminator(i + 1);
+            }
+            return false;
+        }
+
+        if (Is("state", index))
+        {
+            int cursor = index + 1;
+            if (Is("(", cursor))
+            {
+                if (!Is(")", cursor + 1)) return false;
+                cursor += 2;
+            }
+            if (cursor >= tokens.Count || tokens[cursor].Kind != TokenKind.Identifier)
+                return false;
+            cursor++;
+            if (Is("extends", cursor))
+            {
+                cursor++;
+                if (cursor >= tokens.Count || tokens[cursor].Kind != TokenKind.Identifier)
+                    return false;
+                cursor++;
+            }
+            return HasOpeningBraceBeforeTerminator(cursor);
+        }
+
+        if (Is("defaultproperties", index) || Is("replication", index) || Is("cpptext", index))
+            return Is("{", index + 1);
+
+        if (Is("struct", index) || Is("enum", index))
+        {
+            if (index + 1 >= tokens.Count || tokens[index + 1].Kind != TokenKind.Identifier)
+                return false;
+            return HasOpeningBraceBeforeTerminator(index + 2);
+        }
+
+        if (Is("const", index))
+        {
+            bool hasEquals = false;
+            for (int i = index + 1; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == "=") hasEquals = true;
+                if (tokens[i].Text == ";") return hasEquals;
+                if (tokens[i].Text is "{" or "}") return false;
+            }
+            return false;
+        }
+
+        if (Is("var", index))
+        {
+            for (int i = index + 1; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == ";") return true;
+                if (tokens[i].Text is "{" or "}") return false;
+            }
+        }
+
+        return false;
     }
 
     private sealed record FunctionHeader(int KeywordIndex, int BodyOpenIndex, string Name, int Line);
