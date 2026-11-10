@@ -77,6 +77,17 @@ jobs:
               Select-String -LiteralPath $candidate -Pattern "^\s*(auto\s+|simulated\s+)?state\b" | ForEach-Object { Write-Host "$($_.LineNumber): $($_.Line)" }
             }
           }
+          $generatedParty = Join-Path $sourceDir "PartyMatchOutWaitListWnd.uc"
+          $referenceParty = Join-Path $referenceDir "PartyMatchOutWaitListWnd.uc"
+          foreach ($candidate in @($generatedParty, $referenceParty)) {
+            if (Test-Path -LiteralPath $candidate) {
+              Write-Host "===== $candidate : líneas 220-240 ====="
+              $lines = Get-Content -LiteralPath $candidate
+              for ($n = 219; $n -lt [Math]::Min(240, $lines.Count); $n++) {
+                Write-Host ("{0}: {1}" -f ($n + 1), $lines[$n])
+              }
+            }
+          }
 
       - name: Guardar fuentes generadas por el descompilador para diagnóstico
         if: always()
@@ -86,6 +97,7 @@ jobs:
           path: |
             ucc-validation/Compilador  U/Interlude/Interface/Classes/*.uc
             ucc-validation/Compilador  U/ReferenceClasses/ClanDrawerWnd.uc
+            ucc-validation/Compilador  U/ReferenceClasses/PartyMatchOutWaitListWnd.uc
           if-no-files-found: warn
 
       - name: Recompilar las fuentes extraídas del Interface.u real con UCC
