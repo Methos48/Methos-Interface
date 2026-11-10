@@ -1,7 +1,7 @@
 namespace MethosUEngine;
 
 public sealed record UnrealFunctionTarget(string Name, int ExportReference,
-    int ScriptOffsetRelative, int OriginalScriptSize);
+    int ScriptOffsetRelative, int OriginalScriptSize, int OriginalVirtualScriptSize = -1);
 
 public sealed record UnrealScriptCompileResult(byte[] PackageBytes, int FunctionsCompiled,
     IReadOnlyList<UnrealScriptSourceIndex.ClosureRepair> Repairs);
@@ -51,7 +51,9 @@ public static class UnrealScriptCompilerPipeline
                 function.Body, name => builder.AddName(name));
             UnrealScriptPatcher.ReplaceExportBytecode(package, builder,
                 target.ExportReference, target.ScriptOffsetRelative,
-                target.OriginalScriptSize, bytecode);
+                target.OriginalScriptSize, bytecode,
+                target.OriginalVirtualScriptSize >= 0 ? target.OriginalVirtualScriptSize : null,
+                bytecode.Length);
             compiledBytecode.Add((target, bytecode));
             compiled++;
         }
