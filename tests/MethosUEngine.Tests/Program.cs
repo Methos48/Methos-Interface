@@ -89,6 +89,47 @@ static byte[] BuildFunctionFixture()
     return bytes;
 }
 
+if (args.Length >= 3 && args[0] == "--export-sources")
+{
+    string packagePath = args[1];
+    string outputDirectory = args[2];
+    Directory.CreateDirectory(outputDirectory);
+    using var package = UnrealLoader.LoadPackage(packagePath, FileAccess.Read);
+    package.InitializePackage();
+    var classes = package.Objects.OfType<UClass>().Where(item => (int)item > 0).ToArray();
+    int exported = 0, failed = 0;
+    foreach (var item in classes)
+    {
+        try
+        {
+            string name = item.Name?.ToString() ?? $"Class_{exported}";
+            string safeName = string.Concat(name.Select(ch =>
+                Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+            string source = item.Decompile();
+            try
+            {
+                source = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source).Source;
+            }
+            catch
+            {
+                // Keep the original decompiler output; the UCC compatibility test will decide if it is usable.
+            }
+            File.WriteAllText(Path.Combine(outputDirectory, safeName + ".uc"),
+                source, new System.Text.UnicodeEncoding(false, true));
+            exported++;
+        }
+        catch (Exception ex)
+        {
+            failed++;
+            Console.Error.WriteLine($"SOURCE EXPORT ERROR: {item.Name}: {ex.Message}");
+        }
+    }
+    Console.WriteLine($"SOURCE EXPORT: package classes={classes.Length}; exported={exported}; failed={failed}; directory={outputDirectory}");
+    if (exported != classes.Length || failed != 0)
+        throw new Exception("The decompiler did not export every class; UCC compilation test aborted.");
+    return;
+}
+
 static byte[] BuildFixture()
 {
     using var stream = new MemoryStream();
