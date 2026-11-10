@@ -499,6 +499,7 @@ if (args.Length > 0)
         int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
         int exportTableMatches = 0, privateByteSizeMatches = 0, scriptSizeMatches = 0;
         var offsetDiagnostics = new List<string>();
+        var nativeDecompileDiagnostics = new List<string>();
         var byteScriptSizeProperty = typeof(UStruct).GetProperty("ByteScriptSize",
             BindingFlags.Instance | BindingFlags.NonPublic);
         var decompileErrors = new List<string>();
@@ -550,8 +551,24 @@ if (args.Length > 0)
                         (int)relativeOffset, declaredScriptSize);
                     nativeBytecodeDecoded++;
                 }
-                catch (NotSupportedException) { nativeBytecodeUnsupported++; }
-                catch (Exception) { nativeBytecodeMalformed++; }
+                catch (NotSupportedException ex)
+                {
+                    nativeBytecodeUnsupported++;
+                    if (nativeDecompileDiagnostics.Count < 12)
+                        nativeDecompileDiagnostics.Add($"{function.Name}: {ex.GetType().Name}: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    nativeBytecodeMalformed++;
+                    if (nativeDecompileDiagnostics.Count < 12)
+                    {
+                        int codeStart = checked(export.SerialOffset + (int)relativeOffset);
+                        int sampleLength = Math.Min(declaredScriptSize, 16);
+                        string startBytes = Convert.ToHexString(originalPackageBytes.AsSpan(codeStart, sampleLength));
+                        string endBytes = Convert.ToHexString(originalPackageBytes.AsSpan(codeStart + declaredScriptSize - sampleLength, sampleLength));
+                        nativeDecompileDiagnostics.Add($"{function.Name}: {ex.GetType().Name}: {ex.Message}; start={startBytes}; end={endBytes}");
+                    }
+                }
             }
             try
             {
@@ -573,7 +590,7 @@ if (args.Length > 0)
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
         Assert(functionsWithBytecode > 0 && validFunctionOffsets > 0,
             $"No function bytecode offsets could be mapped safely: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}. " + string.Join(" | ", offsetDiagnostics));
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, private ByteScriptSize matches={privateByteSizeMatches}, ScriptSize matches={scriptSizeMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, private ByteScriptSize matches={privateByteSizeMatches}, ScriptSize matches={scriptSizeMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}. Offset samples: {string.Join(" | ", offsetDiagnostics)}. Decoder samples: {string.Join(" | ", nativeDecompileDiagnostics)}.");
     }
 }
 
