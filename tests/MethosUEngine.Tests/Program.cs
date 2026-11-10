@@ -398,6 +398,12 @@ string completedBranchThenReturn = "class ReturnTest; function string GetValue(b
 var completedBranchReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(completedBranchThenReturn);
 Assert(completedBranchReturns.Repairs.Count == 1,
     "A completed if block incorrectly prevented removal of a later unreachable return.");
+string decompiledEnumCall = "class EnumTest; function Test() { PlayConsoleSound(6); }";
+string referenceEnumCall = "class EnumTest; function Test() { PlayConsoleSound(IFST_WINDOW_CLOSE); }";
+string restoredEnumCall = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
+    decompiledEnumCall, referenceEnumCall, out int restoredEnumCount);
+Assert(restoredEnumCount == 1 && restoredEnumCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal),
+    "A decompiled numeric enum argument was not restored from the reference source.");
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
