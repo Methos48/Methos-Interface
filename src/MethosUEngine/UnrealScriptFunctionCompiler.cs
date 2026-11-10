@@ -1,11 +1,11 @@
-public sealed record UnrealScriptVariableReference(byte Token, int ObjectReference);
-
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace MethosUEngine;
+
+public sealed record UnrealScriptVariableReference(byte Token, int ObjectReference);
 
 /// <summary>
 /// First native UnrealScript code generator. This deliberately accepts only a single
