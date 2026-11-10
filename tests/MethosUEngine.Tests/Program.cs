@@ -390,6 +390,7 @@ if (args.Length > 0)
         var realClasses = uelibPackage.Objects.OfType<UClass>().Where(item => (int)item > 0).ToArray();
         int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0;
         int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
+        int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
         var decompileErrors = new List<string>();
         foreach (var realClass in realClasses)
         {
@@ -405,10 +406,28 @@ if (args.Length > 0)
                 }
                 var export = realPackage.Exports[exportReference - 1];
                 long relativeOffset = function.ScriptOffset; // UELib's object stream is already relative to this export.
-                if (relativeOffset >= 4 && relativeOffset <= export.SerialSize - function.ScriptSize)
-                    validFunctionOffsets++;
-                else
+                if (relativeOffset < 4 || relativeOffset > export.SerialSize - function.ScriptSize)
+                {
                     invalidFunctionOffsets++;
+                    continue;
+                }
+                int sizeFieldOffset = checked(export.SerialOffset + (int)relativeOffset - 4);
+                int declaredScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
+                    originalPackageBytes.AsSpan(sizeFieldOffset, 4));
+                if (declaredScriptSize != function.ScriptSize)
+                {
+                    invalidFunctionOffsets++;
+                    continue;
+                }
+                validFunctionOffsets++;
+                try
+                {
+                    _ = UnrealScriptFunctionDecompiler.DecompileExport(realPackage, exportReference,
+                        (int)relativeOffset, function.ScriptSize);
+                    nativeBytecodeDecoded++;
+                }
+                catch (NotSupportedException) { nativeBytecodeUnsupported++; }
+                catch (Exception) { nativeBytecodeMalformed++; }
             }
             try
             {
@@ -429,7 +448,7 @@ if (args.Length > 0)
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
         Assert(functionsWithBytecode > 0 && validFunctionOffsets == functionsWithBytecode && invalidFunctionOffsets == 0,
             $"Function bytecode offsets do not map safely into package exports: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}.");
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets={validFunctionOffsets}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
     }
 }
 
