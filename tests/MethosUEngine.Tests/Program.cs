@@ -147,6 +147,11 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
                 normalized, referenceText, out var repairedFunctions);
             totalNormalized += repairedFunctions.Count;
+            normalized = UnrealScriptFailedFunctionRepair.RestoreInvalidTrailingReturns(
+                normalized, referenceText, out var repairedTrailingReturns);
+            totalNormalized += repairedTrailingReturns.Count;
+            if (Path.GetFileName(sourcePath).Equals("AutoBuffWnd.uc", StringComparison.OrdinalIgnoreCase))
+                Console.WriteLine("AutoBuffWnd EMPTY RETURNS REMOVED: " + string.Join(",", repairedTrailingReturns));
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                 normalized, referenceText, out int restoredEnumArguments);
             totalNormalized += restoredEnumArguments;
