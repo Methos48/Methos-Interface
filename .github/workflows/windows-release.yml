@@ -21,6 +21,10 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Probar motor independiente de paquetes UE2
+        shell: pwsh
+        run: dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release
+
       - name: Publicar ejecutable autónomo x64
         shell: pwsh
         run: |
