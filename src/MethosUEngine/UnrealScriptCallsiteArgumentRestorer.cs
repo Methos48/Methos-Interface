@@ -99,31 +99,25 @@ public static class UnrealScriptCallsiteArgumentRestorer
     {
         var result = new Dictionary<string, List<CallSite>>(StringComparer.OrdinalIgnoreCase);
         var mask = BuildCodeMask(source);
-        for (int i = 0; i < source.Length;)
+        foreach (Match match in Regex.Matches(source, @"\\b(?<name>[A-Za-z_]\\w*)\\s*\\(",
+            RegexOptions.CultureInvariant))
         {
-            if (!mask[i] || !(char.IsLetter(source[i]) || source[i] == '_'))
-            {
-                i++;
-                continue;
-            }
-
-            int start = i++;
-            while (i < source.Length && mask[i] &&
-                   (char.IsLetterOrDigit(source[i]) || source[i] == '_')) i++;
-            string name = source[start..i];
-            int open = i;
-            while (open < source.Length && char.IsWhiteSpace(source[open])) open++;
-            if (open >= source.Length || source[open] != '(') continue;
-            if (Regex.IsMatch(source[..start], @"\b(function|event)\s*$",
+            int nameStart = match.Groups["name"].Index;
+            if (!mask[nameStart]) continue;
+            if (Regex.IsMatch(source[..nameStart], @"\\b(function|event)\\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) continue;
 
+            string name = match.Groups["name"].Value;
+            int open = source.IndexOf('(', nameStart + name.Length);
+            if (open < 0) continue;
             int close = FindMatchingParen(source, open);
             if (close < 0) continue;
+
             var ranges = SplitArguments(source, open + 1, close);
-            var args = ranges.Select(r => new CallArgument(r.Start, r.End, source[r.Start..r.End])).ToList();
+            var args = ranges.Select(range =>
+                new CallArgument(range.Start, range.End, source[range.Start..range.End])).ToList();
             if (!result.TryGetValue(name, out var list)) result[name] = list = new();
             list.Add(new CallSite(name, args));
-            i = close + 1;
         }
         return result;
     }
