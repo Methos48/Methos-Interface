@@ -335,6 +335,70 @@ internal sealed class MainForm : Form
         }
     });
 
+    private UnrealScriptNativeFunctionCatalog BuildNativeCatalog(string packagePath)
+    {
+        string systemDirectory = Path.GetDirectoryName(Path.GetFullPath(packagePath))!;
+        string? nativeTableFile = Directory.GetFiles(systemDirectory, "*.ntl", SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        if (nativeTableFile != null)
+        {
+            var loaded = UnrealScriptNativeFunctionCatalog.Load(nativeTableFile);
+            Log($"Tabla nativa cargada: {Path.GetFileName(nativeTableFile)}; entradas={loaded.Items.Count}.");
+            return loaded;
+        }
+
+        var packageFiles = Directory.GetFiles(systemDirectory, "*.u", SearchOption.TopDirectoryOnly);
+        if (packageFiles.Length == 0)
+            throw new FileNotFoundException("No hay paquetes .u junto al archivo ni una tabla .ntl para resolver los opcodes nativos.");
+
+        var entries = new Dictionary<ushort, UnrealScriptNativeFunction>();
+        int packagesRead = 0, packagesFailed = 0;
+        foreach (var file in packageFiles)
+        {
+            try
+            {
+                using var nativePackage = UnrealLoader.LoadPackage(file, FileAccess.Read);
+                nativePackage.InitializePackage();
+                foreach (var function in nativePackage.Objects.OfType<UFunction>())
+                {
+                    ushort token = function.NativeToken;
+                    if (token < 0x70 || token >= 0x1000) continue;
+                    var kind = function.IsPost() ? UnrealScriptNativeFunctionKind.PostOperator
+                        : function.IsPre() ? UnrealScriptNativeFunctionKind.PreOperator
+                        : function.IsOperator() ? UnrealScriptNativeFunctionKind.Operator
+                        : UnrealScriptNativeFunctionKind.Function;
+                    string name = function.FriendlyName?.ToString();
+                    if (string.IsNullOrWhiteSpace(name)) name = function.Name?.ToString();
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    var item = new UnrealScriptNativeFunction(token, name, kind, function.OperPrecedence);
+                    if (entries.TryGetValue(token, out var existing))
+                    {
+                        if (existing != item)
+                            Log($"Aviso: opcode nativo 0x{token:X} duplicado ({existing.Name}/{item.Name}); se conserva {existing.Name}.");
+                        continue;
+                    }
+                    entries.Add(token, item);
+                }
+                packagesRead++;
+            }
+            catch (Exception ex)
+            {
+                packagesFailed++;
+                Log($"No se pudo leer tabla nativa de {Path.GetFileName(file)}: {ex.Message}");
+            }
+        }
+
+        var catalog = UnrealScriptNativeFunctionCatalog.Create(entries.Values);
+        if (catalog.Items.Count == 0)
+            throw new InvalidDataException("No se encontraron funciones nativas. Importa también Core.u, Engine.u y los paquetes del cliente Lineage II.");
+        var cacheDirectory = Path.Combine(docsRoot, "nativas");
+        Directory.CreateDirectory(cacheDirectory);
+        var cachePath = Path.Combine(cacheDirectory, "Lineage2.ntl");
+        catalog.Save(cachePath);
+        Log($"Tabla nativa creada desde paquetes del cliente: {catalog.Items.Count} opcodes; paquetes leídos={packagesRead}; errores={packagesFailed}. Guardada en {cachePath}");
+        return catalog;
+    }
+
     private static string? FindTool(string name)
     {
         var baseDir = AppContext.BaseDirectory;
