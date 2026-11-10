@@ -82,7 +82,8 @@ public static class UnrealScriptSourceIndex
     }
 
     public sealed record ClosureRepair(string FunctionName, int Line, int ClosuresInserted);
-    public sealed record ClosureRepairResult(string Source, IReadOnlyList<ClosureRepair> Repairs);
+    public sealed record ClosureRepairResult(string Source, IReadOnlyList<ClosureRepair> Repairs,
+        int StringEscapesRepaired);
 
     /// <summary>
     /// Repairs only missing closing braces at the boundary before the next function/event.
@@ -92,6 +93,8 @@ public static class UnrealScriptSourceIndex
     public static ClosureRepairResult RepairMissingFunctionClosures(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        var normalized = NormalizeDecompilerStringEscapes(source);
+        source = normalized.Source;
         List<Token> tokens = Tokenize(source);
         var headers = FindFunctionHeaders(tokens);
         var insertions = new List<(int Offset, string Name, int Line, int Count)>();
@@ -135,7 +138,56 @@ public static class UnrealScriptSourceIndex
         // Fail closed if the repaired copy is still structurally incomplete.
         _ = ParseFunctions(repaired);
         repairs.Reverse();
-        return new ClosureRepairResult(repaired, repairs);
+        return new ClosureRepairResult(repaired, repairs, normalized.RepairedCount);
+    }
+
+    private static (string Source, int RepairedCount) NormalizeDecompilerStringEscapes(string source)
+    {
+        var output = new StringBuilder(source.Length + 16);
+        int repaired = 0;
+        int i = 0;
+        while (i < source.Length)
+        {
+            if (source[i] != '"')
+            {
+                output.Append(source[i++]);
+                continue;
+            }
+
+            output.Append(source[i++]);
+            while (i < source.Length)
+            {
+                char c = source[i];
+                if (c == '\\' && i + 1 < source.Length)
+                {
+                    char next = source[i + 1];
+                    if (next == '"')
+                    {
+                        int afterQuote = i + 2;
+                        while (afterQuote < source.Length && char.IsWhiteSpace(source[afterQuote]))
+                            afterQuote++;
+                        bool looksLikeMissingClosingQuote = afterQuote >= source.Length ||
+                            source[afterQuote] is ',' or ')' or ';' or '}' or ']';
+                        if (looksLikeMissingClosingQuote)
+                        {
+                            output.Append("\\\\").Append('"');
+                            i += 2;
+                            repaired++;
+                            break;
+                        }
+                    }
+
+                    output.Append(c).Append(next);
+                    i += 2;
+                    continue;
+                }
+
+                output.Append(c);
+                i++;
+                if (c == '"') break;
+            }
+        }
+        return (output.ToString(), repaired);
     }
 
     private sealed record FunctionHeader(int KeywordIndex, int BodyOpenIndex, string Name, int Line);
