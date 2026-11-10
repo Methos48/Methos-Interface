@@ -20,9 +20,20 @@ public static class UnrealScriptFailedFunctionRepair
         ArgumentNullException.ThrowIfNull(referenceSource);
         var restored = new List<string>();
         var referenceFunctions = ReadFunctions(referenceSource);
-        var brokenFunctions = ReadFunctions(decompiledSource).Values
-            .Where(function => function.Body.Contains("Failed to format", StringComparison.OrdinalIgnoreCase) ||
-                               function.Body.Contains("Failed to decompile", StringComparison.OrdinalIgnoreCase))
+        var decompiledFunctions = ReadFunctions(decompiledSource);
+        var brokenFunctions = decompiledFunctions.Values
+            .Where(function =>
+            {
+                if (function.Body.Contains("Failed to format", StringComparison.OrdinalIgnoreCase) ||
+                    function.Body.Contains("Failed to decompile", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (!referenceFunctions.TryGetValue(function.Name, out var reference)) return false;
+                int currentDepth = MaximumBraceDepth(function.Body);
+                int referenceDepth = MaximumBraceDepth(reference.Body);
+                return currentDepth >= 12 &&
+                       currentDepth > referenceDepth + 5 &&
+                       currentDepth >= referenceDepth * 2;
+            })
             .ToArray();
 
         var edits = new List<(int Start, int Length, string Replacement)>();
@@ -103,6 +114,73 @@ public static class UnrealScriptFailedFunctionRepair
     }
 
     private sealed record FunctionBlock(string Name, int Start, int Length, string Text, string Body);
+
+    private static int MaximumBraceDepth(string source)
+    {
+        int depth = 0, maximum = 0;
+        bool inString = false, inLineComment = false, inBlockComment = false;
+        char quote = '\0';
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            char current = source[i];
+            char next = i + 1 < source.Length ? source[i + 1] : '\0';
+
+            if (inLineComment)
+            {
+                if (current == '\n') inLineComment = false;
+                continue;
+            }
+            if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    inBlockComment = false;
+                    i++;
+                }
+                continue;
+            }
+            if (inString)
+            {
+                if (current == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (current == quote) inString = false;
+                continue;
+            }
+            if (current == '/' && next == '/')
+            {
+                inLineComment = true;
+                i++;
+                continue;
+            }
+            if (current == '/' && next == '*')
+            {
+                inBlockComment = true;
+                i++;
+                continue;
+            }
+            if (current is '"' or '\'')
+            {
+                inString = true;
+                quote = current;
+                continue;
+            }
+
+            if (current == '{')
+            {
+                depth++;
+                maximum = Math.Max(maximum, depth);
+            }
+            else if (current == '}')
+            {
+                depth--;
+            }
+        }
+        return maximum;
+    }
 
     private static Dictionary<string, FunctionBlock> ReadFunctions(string source)
     {
