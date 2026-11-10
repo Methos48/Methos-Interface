@@ -208,18 +208,47 @@ public static class UnrealScriptFunctionCompiler
             }
         }
 
-        if (candidates.Count == 0) return false;
-        var selected = candidates.OrderBy(item => item.Native.Precedence)
-            .ThenBy(item => item.Position).First();
-        string left = expression[..selected.Position].Trim();
-        string right = expression[(selected.Position + selected.Native.Name.Length)..].Trim();
-        if (left.Length == 0 || right.Length == 0) return false;
+        if (candidates.Count > 0)
+        {
+            var selected = candidates.OrderBy(item => item.Native.Precedence)
+                .ThenBy(item => item.Position).First();
+            string left = expression[..selected.Position].Trim();
+            string right = expression[(selected.Position + selected.Native.Name.Length)..].Trim();
+            if (left.Length == 0 || right.Length == 0) return false;
 
-        WriteNativeToken(output, selected.Native.Token);
-        WriteExpression(output, TrimOuterParentheses(left), nameIndexResolver, variableResolver, nativeFunctions);
-        WriteExpression(output, TrimOuterParentheses(right), nameIndexResolver, variableResolver, nativeFunctions);
-        output.WriteByte(EX_EndFunctionParms);
-        return true;
+            WriteNativeToken(output, selected.Native.Token);
+            WriteExpression(output, TrimOuterParentheses(left), nameIndexResolver, variableResolver, nativeFunctions);
+            WriteExpression(output, TrimOuterParentheses(right), nameIndexResolver, variableResolver, nativeFunctions);
+            output.WriteByte(EX_EndFunctionParms);
+            return true;
+        }
+
+        var prefix = nativeFunctions.Where(item => item.Kind == UnrealScriptNativeFunctionKind.PreOperator)
+            .OrderByDescending(item => item.Name.Length)
+            .FirstOrDefault(item => item.Name.Length > 0 && expression.StartsWith(item.Name, StringComparison.Ordinal));
+        if (prefix != null)
+        {
+            string operand = expression[prefix.Name.Length..].Trim();
+            if (operand.Length == 0) return false;
+            WriteNativeToken(output, prefix.Token);
+            WriteExpression(output, TrimOuterParentheses(operand), nameIndexResolver, variableResolver, nativeFunctions);
+            output.WriteByte(EX_EndFunctionParms);
+            return true;
+        }
+
+        var postfix = nativeFunctions.Where(item => item.Kind == UnrealScriptNativeFunctionKind.PostOperator)
+            .OrderByDescending(item => item.Name.Length)
+            .FirstOrDefault(item => item.Name.Length > 0 && expression.EndsWith(item.Name, StringComparison.Ordinal));
+        if (postfix != null)
+        {
+            string operand = expression[..^postfix.Name.Length].Trim();
+            if (operand.Length == 0) return false;
+            WriteNativeToken(output, postfix.Token);
+            WriteExpression(output, TrimOuterParentheses(operand), nameIndexResolver, variableResolver, nativeFunctions);
+            output.WriteByte(EX_EndFunctionParms);
+            return true;
+        }
+        return false;
     }
 
     private static string TrimOuterParentheses(string expression)
