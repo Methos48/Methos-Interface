@@ -26,11 +26,16 @@ public static class UnrealScriptFunctionDecompiler
     private const byte EX_EndOfScript = 0x47;
 
     public static string DecompileReturnOnly(byte[] bytecode,
+        Func<int, string>? nameResolver = null) =>
+        DecompileReturnOnly(bytecode, out _, nameResolver);
+
+    public static string DecompileReturnOnly(byte[] bytecode, out int consumedBytes,
         Func<int, string>? nameResolver = null)
     {
         ArgumentNullException.ThrowIfNull(bytecode);
-        if (bytecode.Length < 2 || bytecode[^1] != EX_EndOfScript)
-            throw new InvalidDataException("El bytecode no termina con EndOfScript.");
+        consumedBytes = 0;
+        if (bytecode.Length < 2)
+            throw new InvalidDataException("El bytecode es demasiado corto.");
 
         int position = 0;
         byte statement = ReadByte(bytecode, ref position);
@@ -49,32 +54,40 @@ public static class UnrealScriptFunctionDecompiler
             throw new NotSupportedException($"Instrucción inicial de bytecode no admitida: 0x{statement:X2}.");
         }
 
-        if (ReadByte(bytecode, ref position) != EX_EndOfScript || position != bytecode.Length)
-            throw new NotSupportedException("El bytecode contiene instrucciones adicionales fuera del subconjunto de descompilación actual.");
+        if (ReadByte(bytecode, ref position) != EX_EndOfScript)
+            throw new NotSupportedException("La función contiene instrucciones adicionales fuera del subconjunto de descompilación actual.");
+        consumedBytes = position;
         return result;
     }
 
     public static string DecompileExport(UnrealPackageIndex package, int exportReference,
-        int scriptOffsetRelative, int scriptSize)
+        int scriptOffsetRelative, int maxScriptSpan) =>
+        DecompileExport(package, exportReference, scriptOffsetRelative, maxScriptSpan, out _);
+
+    public static string DecompileExport(UnrealPackageIndex package, int exportReference,
+        int scriptOffsetRelative, int maxScriptSpan, out int consumedBytes)
     {
         ArgumentNullException.ThrowIfNull(package);
         if (exportReference < 1 || exportReference > package.Exports.Count)
             throw new ArgumentOutOfRangeException(nameof(exportReference));
         var export = package.Exports[exportReference - 1];
         if (export.SerialSize <= 0) throw new InvalidDataException("El export no contiene datos serializados.");
-        if (scriptOffsetRelative < 4 || scriptSize < 0)
-            throw new InvalidDataException("La posición o tamaño del bytecode no son válidos.");
+        if (scriptOffsetRelative < 4 || maxScriptSpan < 0)
+            throw new InvalidDataException("La posición o límite del bytecode no son válidos.");
         byte[] payload = package.CopyOriginalSlice(export.SerialOffset, export.SerialSize);
         int sizeOffset = scriptOffsetRelative - 4;
         if (sizeOffset > payload.Length - 4)
             throw new InvalidDataException("El campo de tamaño virtual del bytecode está fuera del export.");
         int virtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4));
-        if (virtualScriptSize < scriptSize)
-            throw new InvalidDataException("El tamaño virtual del bytecode es menor que los bytes almacenados.");
-        if (scriptOffsetRelative > payload.Length - scriptSize)
-            throw new InvalidDataException("El bytecode excede el tamaño del export.");
-        byte[] bytecode = payload.AsSpan(scriptOffsetRelative, scriptSize).ToArray();
-        return DecompileReturnOnly(bytecode, index =>
+        if (virtualScriptSize < 0)
+            throw new InvalidDataException("El tamaño virtual del bytecode es negativo.");
+        if (scriptOffsetRelative > payload.Length)
+            throw new InvalidDataException("La posición del bytecode excede el export.");
+
+        int available = payload.Length - scriptOffsetRelative;
+        if (maxScriptSpan > 0) available = Math.Min(available, maxScriptSpan);
+        byte[] bytecode = payload.AsSpan(scriptOffsetRelative, available).ToArray();
+        return DecompileReturnOnly(bytecode, out consumedBytes, index =>
         {
             if (index < 0 || index >= package.Names.Count)
                 throw new InvalidDataException($"Índice de nombre inválido en bytecode: {index}.");
