@@ -25,7 +25,9 @@ public static class UnrealScriptFailedFunctionRepair
             .Where(function =>
             {
                 if (function.Body.Contains("Failed to format", StringComparison.OrdinalIgnoreCase) ||
-                    function.Body.Contains("Failed to decompile", StringComparison.OrdinalIgnoreCase))
+                    function.Body.Contains("Failed to decompile", StringComparison.OrdinalIgnoreCase) ||
+                    Regex.IsMatch(function.Body, @"\\b(?!self\\b)[A-Za-z_]\\w*\\.super\\s*\\(",
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                     return true;
                 if (!referenceFunctions.TryGetValue(function.Name, out var reference)) return false;
                 int currentDepth = MaximumBraceDepth(function.Body);
