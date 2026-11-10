@@ -438,9 +438,7 @@ if (args.Length > 0)
         if (relative > exportEntry.SerialSize - 4) { invalidFunctionOffsets++; continue; }
         int sizeField = checked(exportEntry.SerialOffset + (int)relative - 4);
         int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeField, 4));
-        int actualSize = function.ScriptSize;
-        if (actualSize <= 0 || virtualSize < actualSize ||
-            relative > exportEntry.SerialSize - actualSize)
+        if (virtualSize < 0 || relative > exportEntry.SerialSize - 4)
         { invalidFunctionOffsets++; continue; }
         checkedFunctionOffsets++;
     }
@@ -465,13 +463,12 @@ if (args.Length > 0)
         int relative = (int)relativeLong;
         int sizeOffset = export.SerialOffset + relative - 4;
         int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeOffset, 4));
-        int scriptSize = function.ScriptSize;
-        if (scriptSize <= 0 || virtualSize < scriptSize || relative > export.SerialSize - scriptSize) continue;
+        if (virtualSize < 0 || relative > export.SerialSize - 4) continue;
         try
         {
-            byte[] originalCode = packageFileBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
             string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
-                realPackage, exportReference, relative, scriptSize);
+                realPackage, exportReference, relative, export.SerialSize - relative, out int scriptSize);
+            byte[] originalCode = packageFileBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
             int ResolvePackageName(string name)
             {
                 for (int index = 0; index < realPackage.Names.Count; index++)
@@ -581,13 +578,12 @@ if (args.Length > 1)
             int relative = (int)relativeLong;
             int sizeOffset = export.SerialOffset + relative - 4;
             int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(sourcePackageBytes.AsSpan(sizeOffset, 4));
-            int scriptSize = function.ScriptSize;
-            if (scriptSize <= 0 || virtualSize < scriptSize || relative > export.SerialSize - scriptSize) continue;
+            if (virtualSize < 0 || relative > export.SerialSize - 4) continue;
             try
             {
-                byte[] originalCode = sourcePackageBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
                 string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
-                    sourcePackageIndex, exportReference, relative, scriptSize);
+                    sourcePackageIndex, exportReference, relative, export.SerialSize - relative, out int scriptSize);
+                byte[] originalCode = sourcePackageBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
                 int ResolveName(string name)
                 {
                     for (int nameIndex = 0; nameIndex < sourcePackageIndex.Names.Count; nameIndex++)
