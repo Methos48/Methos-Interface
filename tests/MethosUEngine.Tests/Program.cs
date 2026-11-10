@@ -191,7 +191,7 @@ byte[] assignmentCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(
         : new UnrealScriptVariableReference(0x01, 27));
 string assignmentSource = UnrealScriptFunctionDecompiler.DecompileReturnOnly(assignmentCode,
     objectResolver: reference => reference switch { 12 => "LocalValue", 27 => "Health", _ => throw new InvalidDataException() });
-Assert(assignmentSource.Replace("\\r\\n", "\\n") == "Health = LocalValue;\\nreturn Health;",
+Assert(assignmentSource.Replace("\r\n", "\n") == "Health = LocalValue;\nreturn Health;",
     "Variable assignment and return source/bytecode round trip failed.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
