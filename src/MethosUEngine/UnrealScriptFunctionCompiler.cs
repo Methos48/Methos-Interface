@@ -101,9 +101,9 @@ public static class UnrealScriptFunctionCompiler
         {
             bool negative = numeric.StartsWith("-", StringComparison.Ordinal);
             string hex = numeric.TrimStart('+', '-')[2..];
-            if (!long.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out long raw))
-                throw new InvalidDataException($"Literal hexadecimal inválido: {expression}");
-            long signed = negative ? -raw : raw;
+            if (!uint.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint raw))
+                throw new InvalidDataException($"Literal hexadecimal inválido o demasiado grande: {expression}");
+            long signed = negative ? -(long)raw : raw;
             if (signed < int.MinValue || signed > int.MaxValue)
                 throw new InvalidDataException($"Literal hexadecimal fuera de rango Int32: {expression}");
             WriteIntLiteral(output, (int)signed);
