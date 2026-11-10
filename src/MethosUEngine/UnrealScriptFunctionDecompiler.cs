@@ -122,7 +122,7 @@ public static class UnrealScriptFunctionDecompiler
                 int index = ReadInt32(data, ref position);
                 string name = nameResolver?.Invoke(index)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para constantes Name.");
-                return "'" + name.Replace("\\\\", "\\\\\\\\").Replace("'", "\\\\'") + "'";
+                return "'" + name.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
             }
             default:
                 throw new NotSupportedException($"Expresión de bytecode no admitida: 0x{token:X2}.");
