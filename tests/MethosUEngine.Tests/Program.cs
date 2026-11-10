@@ -421,12 +421,18 @@ if (args.Length > 1)
     int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
     int verifiedNativeRoundTrips = 0, unsupportedNativeFunctions = 0;
     bool realPackageFunctionPatchPassed = false;
+    var missingClassExamples = new List<string>();
+    var missingFunctionExamples = new List<string>();
+    var duplicateFunctionExamples = new List<string>();
+    var nativeUnsupportedExamples = new List<string>();
+    var nativeMismatchExamples = new List<string>();
     foreach (var entry in sourceFiles)
     {
         string sourceClassName = Path.GetFileNameWithoutExtension(entry.Name);
         if (!sourceClasses.TryGetValue(sourceClassName, out var classObject))
         {
             missingClassFiles++;
+            missingClassExamples.Add(sourceClassName);
             continue;
         }
         sourceClassMatches++;
@@ -449,10 +455,14 @@ if (args.Length > 1)
                 }
             }
         }
-        duplicateFunctionTargets += ownedNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .Count(group => group.Count() > 1);
+        var duplicateGroups = ownedNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1).ToArray();
+        duplicateFunctionTargets += duplicateGroups.Length;
+        duplicateFunctionExamples.AddRange(duplicateGroups.Select(group => sourceClassName + "." + group.Key));
         var targetNames = ownedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        missingFunctionMappings += functionsInSource.Count(function => !targetNames.Contains(function.Name));
+        var unmatchedFunctions = functionsInSource.Where(function => !targetNames.Contains(function.Name)).ToArray();
+        missingFunctionMappings += unmatchedFunctions.Length;
+        missingFunctionExamples.AddRange(unmatchedFunctions.Take(5).Select(function => sourceClassName + "." + function.Name));
 
         foreach (var sourceFunction in functionsInSource)
         {
@@ -501,16 +511,25 @@ if (args.Length > 1)
                         realPackageFunctionPatchPassed = true;
                     }
                 }
+                else if (nativeMismatchExamples.Count < 20)
+                    nativeMismatchExamples.Add($"{sourceClassName}.{sourceFunction.Name}: source=[{sourceFunction.Body.Trim()}], native=[{nativeSource.Trim()}], bytes={originalCode.Length}");
             }
             catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
             {
                 unsupportedNativeFunctions++;
+                if (nativeUnsupportedExamples.Count < 20)
+                    nativeUnsupportedExamples.Add($"{sourceClassName}.{sourceFunction.Name}: {ex.Message}");
             }
         }
     }
     Console.WriteLine($"SOURCE MAP: matched classes={sourceClassMatches}/{sourceFiles.Length}; missing class files={missingClassFiles}; source functions without package target={missingFunctionMappings}; duplicate target names={duplicateFunctionTargets}.");
     Console.WriteLine($"NATIVE BYTECODE ROUNDTRIP: exact source+decompiler matches={verifiedNativeRoundTrips}; unsupported or non-literal functions={unsupportedNativeFunctions}.");
     Console.WriteLine($"REAL PACKAGE FUNCTION PATCH: {(realPackageFunctionPatchPassed ? "PASS" : "no compatible function found in supplied sources")}.");
+    Console.WriteLine("MISSING CLASS FILES: " + string.Join(", ", missingClassExamples.Take(30)));
+    Console.WriteLine("MISSING FUNCTION TARGETS: " + string.Join(", ", missingFunctionExamples.Take(30)));
+    Console.WriteLine("DUPLICATE FUNCTION TARGETS: " + string.Join(", ", duplicateFunctionExamples.Take(30)));
+    Console.WriteLine("NATIVE UNSUPPORTED SAMPLES: " + string.Join(" | ", nativeUnsupportedExamples));
+    Console.WriteLine("NATIVE BYTECODE MISMATCH SAMPLES: " + string.Join(" | ", nativeMismatchExamples));
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
