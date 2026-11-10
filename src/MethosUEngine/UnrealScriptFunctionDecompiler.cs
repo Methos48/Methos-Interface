@@ -5,8 +5,8 @@ using System.Text;
 namespace MethosUEngine;
 
 /// <summary>
-/// First native UnrealScript bytecode reader. It intentionally decodes the same
-/// literal-return subset emitted by UnrealScriptFunctionCompiler.
+/// Initial native UnrealScript bytecode reader. It decodes straight-line assignments
+/// and return statements emitted by the current compiler subset.
 /// </summary>
 public static class UnrealScriptFunctionDecompiler
 {
