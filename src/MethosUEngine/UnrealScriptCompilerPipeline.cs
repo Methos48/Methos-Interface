@@ -1,13 +1,13 @@
 namespace MethosUEngine;
 
 public sealed record UnrealFunctionTarget(string Name, int ExportReference,
-    int ScriptOffsetRelative, int OriginalScriptSize);
+    int ScriptOffsetRelative, int DeclaredScriptSize, int OriginalScriptSize);
 
 public sealed record UnrealScriptCompileResult(byte[] PackageBytes, int FunctionsCompiled,
     IReadOnlyList<UnrealScriptSourceIndex.ClosureRepair> Repairs);
 
 /// <summary>
-/// Connects source indexing, literal-return bytecode generation, bytecode patching
+/// Connects source indexing, native bytecode generation, bytecode patching
 /// and package rebuilding. It never writes the source package itself.
 /// </summary>
 public static class UnrealScriptCompilerPipeline
@@ -52,7 +52,7 @@ public static class UnrealScriptCompilerPipeline
                 function.Body, name => builder.AddName(name), variableResolver, nativeFunctions);
             UnrealScriptPatcher.ReplaceExportBytecode(package, builder,
                 target.ExportReference, target.ScriptOffsetRelative,
-                target.OriginalScriptSize, bytecode);
+                target.DeclaredScriptSize, target.OriginalScriptSize, bytecode);
             compiled++;
         }
 
