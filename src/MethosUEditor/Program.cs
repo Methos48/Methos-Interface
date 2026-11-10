@@ -245,86 +245,115 @@ internal sealed class MainForm : Form
     private Task CompileFolder(string packagePath) => Task.Run(() =>
     {
         var baseName = Path.GetFileNameWithoutExtension(packagePath);
-        var source = Path.Combine(PartsDir, baseName);
-        if (!Directory.Exists(source))
+        var sourceDirectory = Path.Combine(PartsDir, baseName);
+        if (!Directory.Exists(sourceDirectory))
         {
             var candidate = Path.Combine(PartsDir, "Classes");
-            if (Directory.Exists(candidate)) source = candidate;
-            else throw new DirectoryNotFoundException($"No existe la carpeta de fuentes: {source}");
+            if (Directory.Exists(candidate)) sourceDirectory = candidate;
+            else throw new DirectoryNotFoundException($"No existe la carpeta de fuentes: {sourceDirectory}");
         }
-        var ucFiles = Directory.GetFiles(source, "*.uc", SearchOption.AllDirectories);
-        if (ucFiles.Length == 0) throw new InvalidOperationException($"No se encontraron archivos .uc en {source}");
-        var ucc = FindTool("UCC.exe");
-        if (ucc == null)
+
+        var ucFiles = Directory.GetFiles(sourceDirectory, "*.uc", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (ucFiles.Length == 0)
+            throw new InvalidOperationException($"No se encontraron archivos .uc en {sourceDirectory}");
+
+        var duplicateNames = ucFiles.GroupBy(Path.GetFileNameWithoutExtension, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToArray();
+        if (duplicateNames.Length > 0)
+            throw new InvalidOperationException("Hay nombres de clase .uc duplicados: " + string.Join(", ", duplicateNames));
+
+        Log($"Motor nativo Methos: preparando {ucFiles.Length} fuentes .uc. No se ejecutará UCC.exe.");
+        byte[] packageBytes = File.ReadAllBytes(packagePath);
+        var nativePackage = UnrealPackageIndex.Parse(packageBytes);
+
+        using var metadataPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read);
+        metadataPackage.InitializePackage();
+        var classes = metadataPackage.Objects.OfType<UClass>()
+            .Where(item => (int)item > 0)
+            .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
+
+        int classesProcessed = 0, functionsCompiled = 0, repairedFunctions = 0, insertedClosures = 0;
+        foreach (string sourcePath in ucFiles)
         {
-            ucc = (string?)Invoke(new Func<string?>(() =>
+            string className = Path.GetFileNameWithoutExtension(sourcePath);
+            if (!classes.TryGetValue(className, out var classObject))
+                throw new InvalidDataException($"La clase '{className}' no existe como UClass en el paquete base. Crear clases nuevas todavía no está implementado; no se modificó el paquete.");
+
+            string sourceText = File.ReadAllText(sourcePath);
+            var sourceRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText);
+            var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(sourceRepair.Source);
+            if (sourceFunctions.Count == 0)
             {
-                using var d = new OpenFileDialog { Filter = "Compilador Unreal (UCC.exe)|UCC.exe", Title = "Selecciona UCC.exe del compilador Lineage II" };
-                return d.ShowDialog() == DialogResult.OK ? d.FileName : null;
-            }));
-            if (string.IsNullOrWhiteSpace(ucc)) throw new FileNotFoundException("Para compilar se necesita UCC.exe, incluido en un entorno de compilación compatible con Lineage II.");
+                Log($"Sin cuerpos de función para compilar: {className}.uc (se conserva el bytecode original).");
+                continue;
+            }
+
+            var ownedFunctions = metadataPackage.Objects.OfType<UFunction>()
+                .Where(function => IsOwnedByClass(function, classObject)).ToList();
+            var targets = new List<UnrealFunctionTarget>();
+            foreach (var function in ownedFunctions)
+            {
+                if (function.ExportTable == null)
+                    throw new InvalidDataException($"La función '{className}.{function.Name}' no tiene una entrada export válida.");
+                long relativeOffset = function.ScriptOffset - function.ExportTable.SerialOffset;
+                if (relativeOffset < 4 || relativeOffset > int.MaxValue || function.ScriptSize < 0)
+                    throw new InvalidDataException($"La posición del bytecode de '{className}.{function.Name}' no es válida.");
+                targets.Add(new UnrealFunctionTarget(function.Name.ToString(), (int)function,
+                    checked((int)relativeOffset), function.ScriptSize));
+            }
+
+            var result = UnrealScriptCompilerPipeline.CompileClassSource(
+                sourceRepair.Source, nativePackage, targets, repairMissingFunctionClosures: false);
+            packageBytes = result.PackageBytes;
+            nativePackage = UnrealPackageIndex.Parse(packageBytes);
+            classesProcessed++;
+            functionsCompiled += result.FunctionsCompiled;
+            repairedFunctions += sourceRepair.Repairs.Count;
+            insertedClosures += sourceRepair.Repairs.Sum(item => item.ClosuresInserted);
+            Log($"Clase compilada con motor nativo: {className}; funciones={result.FunctionsCompiled}; reparaciones={sourceRepair.Repairs.Count}.");
+            foreach (var repair in sourceRepair.Repairs)
+                Log($"  Reparación auditada: {repair.FunctionName}, línea {repair.Line}, llaves insertadas={repair.ClosuresInserted}.");
         }
-        var systemDir = Path.GetDirectoryName(ucc)!;
-        var root = Directory.GetParent(systemDir)?.FullName ?? throw new InvalidOperationException("No se pudo identificar la carpeta raíz del compilador.");
-        var temp = Path.Combine(Path.GetTempPath(), "MethosU_" + Guid.NewGuid().ToString("N"));
+
+        if (classesProcessed == 0 || functionsCompiled == 0)
+            throw new NotSupportedException("El motor nativo todavía no encontró funciones compatibles para compilar. No se reemplazó el .u. Actualmente admite un subconjunto de cuerpos return con literales; el soporte general de UnrealScript sigue en desarrollo.");
+
+        string temporaryOutput = Path.Combine(Path.GetTempPath(), "MethosU_" + Guid.NewGuid().ToString("N") + ".u");
         try
         {
-            var tempSystem = Path.Combine(temp, Path.GetFileName(systemDir));
-            CopyDirectory(systemDir, tempSystem);
-            var classDir = Path.Combine(temp, baseName, "Classes");
-            Directory.CreateDirectory(classDir);
-            var duplicateNames = ucFiles.GroupBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
-            if (duplicateNames.Count > 0)
-                throw new InvalidOperationException("Hay nombres de clase .uc duplicados en distintas subcarpetas: " + string.Join(", ", duplicateNames));
-            foreach (var file in ucFiles) File.Copy(file, Path.Combine(classDir, Path.GetFileName(file)), true);
-            ConfigureCompilerIni(tempSystem, baseName);
+            File.WriteAllBytes(temporaryOutput, packageBytes);
+            var verified = UnrealPackageIndex.Open(temporaryOutput);
+            if (verified.Exports.Count != nativePackage.Exports.Count ||
+                verified.Names.Count != nativePackage.Names.Count ||
+                verified.Imports.Count != nativePackage.Imports.Count)
+                throw new InvalidDataException("La verificación final detectó cambios inesperados en las tablas del paquete.");
 
-            // UCC puede omitir la compilación si ya existe el paquete .u.
-            // Se elimina únicamente la copia temporal; el original del usuario permanece intacto.
-            var stalePackage = Path.Combine(tempSystem, baseName + ".u");
-            if (File.Exists(stalePackage)) File.Delete(stalePackage);
-
-            Log($"Compilando {ucFiles.Length} clases con {ucc}...");
-            var tempUcc = Path.Combine(tempSystem, Path.GetFileName(ucc));
-            var ini = FindCompilerIni(tempSystem);
-            var args = "make" + (ini == null ? "" : " -ini=" + Quote(Path.GetFileName(ini)));
-            var psi = new ProcessStartInfo(tempUcc, args) { WorkingDirectory = tempSystem, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
-            using var process = new Process { StartInfo = psi };
-            process.OutputDataReceived += (_, e) => { if (e.Data != null) Log(e.Data); };
-            process.ErrorDataReceived += (_, e) => { if (e.Data != null) Log(e.Data); };
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            if (!process.WaitForExit((int)TimeSpan.FromMinutes(5).TotalMilliseconds))
+            using (var validation = UnrealLoader.LoadPackage(temporaryOutput, FileAccess.Read))
             {
-                try { process.Kill(true); } catch { }
-                throw new TimeoutException("UCC superó el límite de 5 minutos y fue detenido. Revisa el compilador y sus dependencias.");
-            }
-            process.WaitForExit(); // Espera también a que terminen los lectores de salida.
-
-            var result = Path.Combine(tempSystem, baseName + ".u");
-            if (process.ExitCode != 0 || !File.Exists(result))
-                throw new InvalidOperationException("UCC no generó el paquete. Revisa el registro. Comprueba que el compilador sea de Interlude y tenga Core, Engine, Fire, Editor y NWindow.");
-
-            // Comprobación estructural antes de reemplazar el archivo de destino.
-            using (var validationPackage = UnrealLoader.LoadPackage(result, FileAccess.Read))
-            {
-                validationPackage.InitializePackage();
-                var builtClasses = validationPackage.Objects.OfType<UClass>().Count(o => (int)o > 0);
-                if (builtClasses == 0)
-                    throw new InvalidDataException("UCC creó un archivo, pero no contiene clases UnrealScript reconocibles. No se reemplazó el .u original.");
-                Log($"Validación del paquete: {builtClasses} clases detectadas.");
+                validation.InitializePackage();
+                int classCount = validation.Objects.OfType<UClass>().Count(item => (int)item > 0);
+                if (classCount == 0)
+                    throw new InvalidDataException("El paquete reconstruido no contiene clases reconocibles.");
+                Log($"Verificación final: {classCount} clases; names={verified.Names.Count}, imports={verified.Imports.Count}, exports={verified.Exports.Count}.");
             }
 
             var destination = Path.Combine(CompleteDir, baseName + ".u");
-            CopyWithBackup(result, destination);
-            Log($"Compilación terminada y validada: {destination}");
+            CopyWithBackup(temporaryOutput, destination);
+            Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}. Archivo: {destination}");
         }
         finally
         {
-            try { if (Directory.Exists(temp)) Directory.Delete(temp, true); } catch { }
+            if (File.Exists(temporaryOutput)) File.Delete(temporaryOutput);
         }
     });
+
+    private static bool IsOwnedByClass(UObject candidate, UClass owner)
+    {
+        for (UObject? current = candidate.Outer; current != null; current = current.Outer)
+            if (ReferenceEquals(current, owner)) return true;
+        return false;
+    }
 
     private static string? FindTool(string name)
     {
