@@ -468,7 +468,7 @@ Assert(repairedFunctionNames.Count == 1 &&
        repairedFunctionNames[0] == "BrokenFunction" &&
        repairedFunctionSource.Contains("function int BrokenFunction() {\n    return 42;", StringComparison.Ordinal) &&
        repairedFunctionSource.Contains("return 7;", StringComparison.Ordinal),
-    "The failed-function repair did not restore only the broken function.");
+    $"The failed-function repair did not restore only the broken function. Count={repairedFunctionNames.Count}; Names={string.Join(",", repairedFunctionNames)}; Source={repairedFunctionSource}");
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
