@@ -86,6 +86,13 @@ public static class UnrealScriptFunctionDecompiler
 
     public static string DecompileExport(UnrealPackageIndex package, int exportReference,
         int scriptOffsetRelative, int scriptSize, Func<int, string>? objectResolver = null,
+        Func<ushort, UnrealScriptNativeFunction?>? nativeResolver = null) =>
+        DecompileExport(package, exportReference, scriptOffsetRelative,
+            scriptSize, scriptSize, objectResolver, nativeResolver);
+
+    public static string DecompileExport(UnrealPackageIndex package, int exportReference,
+        int scriptOffsetRelative, int declaredScriptSize, int actualScriptSize,
+        Func<int, string>? objectResolver = null,
         Func<ushort, UnrealScriptNativeFunction?>? nativeResolver = null)
     {
         ArgumentNullException.ThrowIfNull(package);
@@ -93,16 +100,16 @@ public static class UnrealScriptFunctionDecompiler
             throw new ArgumentOutOfRangeException(nameof(exportReference));
         var export = package.Exports[exportReference - 1];
         if (export.SerialSize <= 0) throw new InvalidDataException("El export no contiene datos serializados.");
-        if (scriptOffsetRelative < 4 || scriptSize < 0)
+        if (scriptOffsetRelative < 4 || declaredScriptSize < 0 || actualScriptSize < 0)
             throw new InvalidDataException("La posición o tamaño del bytecode no son válidos.");
         byte[] payload = package.CopyOriginalSlice(export.SerialOffset, export.SerialSize);
         int sizeOffset = scriptOffsetRelative - 4;
         if (sizeOffset > payload.Length - 4 ||
-            BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4)) != scriptSize)
-            throw new InvalidDataException("El tamaño del bytecode no coincide con el campo serializado.");
-        if (scriptOffsetRelative > payload.Length - scriptSize)
-            throw new InvalidDataException("El bytecode excede el tamaño del export.");
-        byte[] bytecode = payload.AsSpan(scriptOffsetRelative, scriptSize).ToArray();
+            BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4)) != declaredScriptSize)
+            throw new InvalidDataException("El tamaño declarado del bytecode no coincide con el campo serializado.");
+        if (scriptOffsetRelative > payload.Length - actualScriptSize)
+            throw new InvalidDataException("El bytecode real excede el tamaño del export.");
+        byte[] bytecode = payload.AsSpan(scriptOffsetRelative, actualScriptSize).ToArray();
         return DecompileReturnOnly(bytecode, index =>
         {
             if (index < 0 || index >= package.Names.Count)
