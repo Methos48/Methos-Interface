@@ -150,6 +150,31 @@ public static class UnrealScriptSourceIndex
         int i = 0;
         while (i < source.Length)
         {
+            if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '/')
+            {
+                while (i < source.Length && source[i] != '\n') output.Append(source[i++]);
+                continue;
+            }
+            if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '*')
+            {
+                int depth = 1;
+                output.Append(source[i++]).Append(source[i++]);
+                while (i < source.Length && depth > 0)
+                {
+                    if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '*')
+                    {
+                        depth++;
+                        output.Append(source[i++]).Append(source[i++]);
+                    }
+                    else if (source[i] == '*' && i + 1 < source.Length && source[i + 1] == '/')
+                    {
+                        depth--;
+                        output.Append(source[i++]).Append(source[i++]);
+                    }
+                    else output.Append(source[i++]);
+                }
+                continue;
+            }
             if (source[i] != '"')
             {
                 output.Append(source[i++]);
