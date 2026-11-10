@@ -1,3 +1,5 @@
+public sealed record UnrealScriptVariableReference(byte Token, int ObjectReference);
+
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
@@ -12,6 +14,9 @@ namespace MethosUEngine;
 /// </summary>
 public static class UnrealScriptFunctionCompiler
 {
+    private const byte EX_LocalVariable = 0x00;
+    private const byte EX_InstanceVariable = 0x01;
+    private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
@@ -35,7 +40,8 @@ public static class UnrealScriptFunctionCompiler
         @"^[+-]?(?:0[xX][0-9a-fA-F]+|(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?[fF]?)$",
         RegexOptions.CultureInvariant);
 
-    public static byte[] CompileReturnOnlyBody(string body, Func<string, int>? nameIndexResolver = null)
+    public static byte[] CompileReturnOnlyBody(string body, Func<string, int>? nameIndexResolver = null,
+        Func<string, UnrealScriptVariableReference>? variableResolver = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         string clean = StripComments(body).Trim();
@@ -48,12 +54,13 @@ public static class UnrealScriptFunctionCompiler
 
         using var output = new MemoryStream();
         output.WriteByte(EX_Return);
-        WriteLiteral(output, match.Groups["expr"].Value.Trim(), nameIndexResolver);
+        WriteLiteral(output, match.Groups["expr"].Value.Trim(), nameIndexResolver, variableResolver);
         output.WriteByte(EX_EndOfScript);
         return output.ToArray();
     }
 
-    private static void WriteLiteral(Stream output, string expression, Func<string, int>? nameIndexResolver)
+    private static void WriteLiteral(Stream output, string expression, Func<string, int>? nameIndexResolver,
+        Func<string, UnrealScriptVariableReference>? variableResolver)
     {
         if (expression.Equals("true", StringComparison.OrdinalIgnoreCase))
         { output.WriteByte(EX_True); return; }
@@ -87,6 +94,18 @@ public static class UnrealScriptFunctionCompiler
             int index = nameIndexResolver(DecodeEscapes(expression[1..^1]));
             output.WriteByte(EX_NameConst);
             WriteInt32(output, index);
+            return;
+        }
+
+        if (Regex.IsMatch(expression, @"^(?:default\\.)?[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            if (variableResolver == null)
+                throw new NotSupportedException($"La variable '{expression}' requiere resolver su referencia de objeto.");
+            var variable = variableResolver(expression);
+            if (variable.Token is not (EX_LocalVariable or EX_InstanceVariable or EX_DefaultVariable))
+                throw new InvalidDataException($"Token de variable no válido: 0x{variable.Token:X2}.");
+            output.WriteByte(variable.Token);
+            WriteInt32(output, variable.ObjectReference);
             return;
         }
 
