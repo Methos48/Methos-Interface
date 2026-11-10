@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 using MethosUEngine;
+using UELib;
+using UELib.Core;
 
 static void Assert(bool condition, string message)
 {
@@ -349,6 +351,35 @@ if (args.Length > 0)
     Assert(realRoundTrip.Imports.SequenceEqual(realPackage.Imports), "Real package import table changed during round trip.");
     Assert(realRoundTrip.Exports.SequenceEqual(realPackage.Exports), "Real package export table changed during round trip.");
     Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}.");
+
+    using var metadataPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read);
+    metadataPackage.InitializePackage();
+    var packageClasses = metadataPackage.Objects.OfType<UClass>()
+        .Where(item => (int)item > 0)
+        .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
+    var packageFunctions = metadataPackage.Objects.OfType<UFunction>().ToArray();
+    byte[] packageFileBytes = File.ReadAllBytes(packagePath);
+    int checkedFunctionOffsets = 0, invalidFunctionOffsets = 0;
+    foreach (var function in packageFunctions)
+    {
+        if (function.ExportTable == null) { invalidFunctionOffsets++; continue; }
+        long relative = function.ScriptOffset - function.ExportTable.SerialOffset;
+        int exportRef = (int)function;
+        if (exportRef < 1 || exportRef > realPackage.Exports.Count ||
+            relative < 4 || relative > int.MaxValue)
+        { invalidFunctionOffsets++; continue; }
+        var exportEntry = realPackage.Exports[exportRef - 1];
+        if (relative > exportEntry.SerialSize - 4) { invalidFunctionOffsets++; continue; }
+        int sizeField = checked(exportEntry.SerialOffset + (int)relative - 4);
+        int storedSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeField, 4));
+        if (storedSize < 0 || relative > exportEntry.SerialSize - storedSize)
+        { invalidFunctionOffsets++; continue; }
+        checkedFunctionOffsets++;
+    }
+    Assert(checkedFunctionOffsets > 0, "No UFunction bytecode offsets could be validated against the native package parser.");
+    Assert(invalidFunctionOffsets == 0, $"UELib returned {invalidFunctionOffsets} invalid UFunction bytecode offsets.");
+    Console.WriteLine($"PASS: UELib metadata bridge; classes={packageClasses.Count}, functions={packageFunctions.Length}, validated bytecode offsets={checkedFunctionOffsets}.");
+
 }
 
 if (args.Length > 1)
