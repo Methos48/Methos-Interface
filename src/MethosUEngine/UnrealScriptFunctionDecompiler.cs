@@ -102,7 +102,7 @@ public static class UnrealScriptFunctionDecompiler
             if (index < 0 || index >= package.Names.Count)
                 throw new InvalidDataException($"Índice de nombre inválido en bytecode: {index}.");
             return package.Names[index];
-        }, objectResolver);
+        }, objectResolver ?? package.ResolveObjectName);
     }
 
     private static string ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver,
