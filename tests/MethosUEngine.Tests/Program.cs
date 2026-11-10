@@ -556,6 +556,20 @@ Assert(restoredNumericEnumCastCount == 1 &&
        restoredNumericEnumCast.Contains("Type = EActionCategory(1);", StringComparison.Ordinal),
     "Numeric enum value was not restored to its original enum cast.");
 
+string decompiledLostByteConstant = """
+class LostByteConstantTest;
+function Test() { Info.t_color.R = byte(R); }
+""";
+string referenceLostByteConstant = """
+class LostByteConstantTest;
+function Test() { Info.t_color.R = byte(255); }
+""";
+string restoredLostByteConstant = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+    decompiledLostByteConstant, referenceLostByteConstant, out int restoredLostByteConstantCount);
+Assert(restoredLostByteConstantCount == 1 &&
+       restoredLostByteConstant.Contains("Info.t_color.R = byte(255);", StringComparison.Ordinal),
+    "Lost numeric byte constant was not restored from the matching reference assignment.");
+
 string brokenFunctionSource = """
 class RepairTest;
 function int HealthyFunction() { return 7; }
