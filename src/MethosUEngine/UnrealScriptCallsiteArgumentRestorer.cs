@@ -105,10 +105,20 @@ public static class UnrealScriptCallsiteArgumentRestorer
 
                 string originalValue = referenceValues[occurrence];
                 bool restore = false;
-                if (int.TryParse(assignment.Right, out _))
+                if (int.TryParse(assignment.Right, out int numericValue))
                 {
                     restore = Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
                         RegexOptions.CultureInvariant);
+                    if (!restore)
+                    {
+                        Match originalEnumCast = Regex.Match(originalValue,
+                            @"^(?<type>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*\((?<args>[^;{}]*)\)$",
+                            RegexOptions.CultureInvariant);
+                        restore = originalEnumCast.Success &&
+                            !IsPrimitiveCastType(originalEnumCast.Groups["type"].Value) &&
+                            int.TryParse(NormalizeExpression(originalEnumCast.Groups["args"].Value),
+                                out int enumValue) && enumValue == numericValue;
+                    }
                 }
                 else
                 {
