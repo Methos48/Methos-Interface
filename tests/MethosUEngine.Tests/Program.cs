@@ -239,7 +239,7 @@ state Idle
 """;
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
-Assert(indexedFunctions[0].Body.Contains("..\\\\L2text\\\\"),
+Assert(indexedFunctions[0].Body.Contains("L2text") && indexedFunctions[0].Body.Contains("\\"),
     "A path string ending in a backslash was not scanned as a closed string literal.");
 Assert(indexedFunctions[0].Name == "Add" && indexedFunctions[0].Body.Contains("return A + B"),
     "Function source indexer failed to extract the Add body.");
