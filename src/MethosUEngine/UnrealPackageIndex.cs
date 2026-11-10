@@ -208,6 +208,22 @@ public sealed class UnrealPackageIndex
         return checked((int)value);
     }
 
+    public string ResolveObjectName(int objectReference)
+    {
+        if (objectReference == 0) return Names.Count > 0 ? Names[0] : "None";
+        if (objectReference > 0)
+        {
+            if (objectReference > Exports.Count)
+                throw new ArgumentOutOfRangeException(nameof(objectReference), "Referencia de export fuera de rango.");
+            return Names[Exports[objectReference - 1].ObjectName];
+        }
+
+        long importIndex = -(long)objectReference - 1;
+        if (importIndex < 0 || importIndex >= Imports.Count)
+            throw new ArgumentOutOfRangeException(nameof(objectReference), "Referencia de import fuera de rango.");
+        return Names[Imports[(int)importIndex].ObjectName];
+    }
+
     public static int DecodeCompactIndex(byte[] data, ref int position) => ReadCompact(data, ref position);
 
     private static int ReadCompact(byte[] data, ref int position)
