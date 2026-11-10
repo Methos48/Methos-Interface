@@ -150,6 +150,17 @@ public static class UnrealScriptCallsiteArgumentRestorer
                         !IsPrimitiveCastType(originalCast.Groups["type"].Value) &&
                         NormalizeExpression(currentCast.Groups["args"].Value) ==
                         NormalizeExpression(originalCast.Groups["args"].Value);
+                    if (!restore && currentCast.Success && originalCast.Success &&
+                        currentCast.Groups["type"].Value.Equals(originalCast.Groups["type"].Value,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        string currentCastArgument = NormalizeExpression(currentCast.Groups["args"].Value);
+                        string originalCastArgument = NormalizeExpression(originalCast.Groups["args"].Value);
+                        restore = Regex.IsMatch(currentCastArgument, @"^[A-Za-z_]\w*$",
+                                    RegexOptions.CultureInvariant) &&
+                                  Regex.IsMatch(originalCastArgument, @"^-?\d+$",
+                                    RegexOptions.CultureInvariant);
+                    }
                 }
                 if (!restore) continue;
 
