@@ -339,9 +339,27 @@ if (args.Length > 0)
         uelibPackage.InitializePackage();
         var realClasses = uelibPackage.Objects.OfType<UClass>().Where(item => (int)item > 0).ToArray();
         int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0;
+        int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
         var decompileErrors = new List<string>();
         foreach (var realClass in realClasses)
         {
+            foreach (var function in realClass.EnumerateFields<UFunction>())
+            {
+                if (function.ScriptSize <= 0) continue;
+                functionsWithBytecode++;
+                int exportReference = (int)function;
+                if (exportReference < 1 || exportReference > realPackage.Exports.Count)
+                {
+                    invalidFunctionOffsets++;
+                    continue;
+                }
+                var export = realPackage.Exports[exportReference - 1];
+                long relativeOffset = function.ScriptOffset - export.SerialOffset;
+                if (relativeOffset >= 4 && relativeOffset <= export.SerialSize - function.ScriptSize)
+                    validFunctionOffsets++;
+                else
+                    invalidFunctionOffsets++;
+            }
             try
             {
                 string decompiled = realClass.Decompile();
@@ -359,7 +377,9 @@ if (args.Length > 0)
         Assert(realClasses.Length > 0, "UELib found no classes in the real package.");
         Assert(decompileErrors.Count == 0, "Real package decompilation errors: " + string.Join(" | ", decompileErrors.Take(8)));
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}.");
+        Assert(functionsWithBytecode > 0 && validFunctionOffsets == functionsWithBytecode && invalidFunctionOffsets == 0,
+            $"Function bytecode offsets do not map safely into package exports: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets={validFunctionOffsets}.");
     }
 }
 
