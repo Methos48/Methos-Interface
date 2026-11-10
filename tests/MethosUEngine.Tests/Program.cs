@@ -363,9 +363,11 @@ if (args.Length > 0)
     Assert(nativeBuilderPackage.Names.SequenceEqual(realPackage.Names), "Native builder changed the real package name table.");
     Assert(nativeBuilderPackage.Imports.SequenceEqual(realPackage.Imports), "Native builder changed the real package import table.");
     Assert(nativeBuilderPackage.Exports.SequenceEqual(realPackage.Exports), "Native builder changed the real package export table.");
-    foreach (var export in realPackage.Exports.Where(item => item.SerialSize > 0))
+    for (int exportIndex = 0; exportIndex < realPackage.Exports.Count; exportIndex++)
     {
-        var rebuiltExport = nativeBuilderPackage.Exports[realPackage.Exports.IndexOf(export)];
+        var export = realPackage.Exports[exportIndex];
+        if (export.SerialSize <= 0) continue;
+        var rebuiltExport = nativeBuilderPackage.Exports[exportIndex];
         Assert(originalPackageBytes.AsSpan(export.SerialOffset, export.SerialSize)
             .SequenceEqual(nativeBuilderBytes.AsSpan(rebuiltExport.SerialOffset, rebuiltExport.SerialSize)),
             $"Native builder changed serialized payload for export {realPackage.Names[export.ObjectName]}.");
