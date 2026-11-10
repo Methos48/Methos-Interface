@@ -18,6 +18,7 @@ public static class UnrealScriptFunctionCompiler
     private const byte EX_InstanceVariable = 0x01;
     private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
+    private const byte EX_Let = 0x0F;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
     private const byte EX_StringConst = 0x1F;
@@ -45,18 +46,105 @@ public static class UnrealScriptFunctionCompiler
     {
         ArgumentNullException.ThrowIfNull(body);
         string clean = StripComments(body).Trim();
-        if (Regex.IsMatch(clean, @"^return\s*;$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-            return new[] { EX_ReturnNothing, EX_EndOfScript };
-
-        Match match = ReturnExpression.Match(clean);
-        if (!match.Success)
-            throw new NotSupportedException("Este primer compilador solo admite cuerpos con una única instrucción return y una expresión literal.");
+        var statements = SplitStatements(clean);
+        if (statements.Count == 0)
+            throw new InvalidDataException("El cuerpo de la función está vacío.");
 
         using var output = new MemoryStream();
-        output.WriteByte(EX_Return);
-        WriteLiteral(output, match.Groups["expr"].Value.Trim(), nameIndexResolver, variableResolver);
+        bool sawReturn = false;
+        foreach (string statement in statements)
+        {
+            if (sawReturn)
+                throw new NotSupportedException("No se admiten instrucciones después de return en este subconjunto del compilador.");
+
+            if (statement.Equals("return", StringComparison.OrdinalIgnoreCase))
+            {
+                output.WriteByte(EX_ReturnNothing);
+                sawReturn = true;
+                continue;
+            }
+
+            if (statement.StartsWith("return ", StringComparison.OrdinalIgnoreCase))
+            {
+                output.WriteByte(EX_Return);
+                WriteLiteral(output, statement[7..].Trim(), nameIndexResolver, variableResolver);
+                sawReturn = true;
+                continue;
+            }
+
+            int assignment = FindSimpleAssignment(statement);
+            if (assignment <= 0)
+                throw new NotSupportedException($"Instrucción todavía no implementada: {statement}");
+
+            string left = statement[..assignment].Trim();
+            string right = statement[(assignment + 1)..].Trim();
+            if (variableResolver == null)
+                throw new NotSupportedException("La asignación requiere resolver la variable de destino.");
+            var variable = variableResolver(left);
+            if (variable.Token is not (EX_LocalVariable or EX_InstanceVariable))
+                throw new NotSupportedException("Solo se admiten asignaciones a variables locales o de instancia.");
+            output.WriteByte(EX_Let);
+            output.WriteByte(variable.Token);
+            WriteInt32(output, variable.ObjectReference);
+            WriteLiteral(output, right, nameIndexResolver, variableResolver);
+        }
+
+        if (!sawReturn)
+            throw new NotSupportedException("Este subconjunto exige una instrucción return explícita al final de la función.");
         output.WriteByte(EX_EndOfScript);
         return output.ToArray();
+    }
+
+    private static List<string> SplitStatements(string source)
+    {
+        var statements = new List<string>();
+        int start = 0;
+        char quote = '\0';
+        for (int i = 0; i < source.Length; i++)
+        {
+            char c = source[i];
+            if (quote != '\0')
+            {
+                if (c == '\\\\' && i + 1 < source.Length) { i++; continue; }
+                if (c == quote) quote = '\0';
+                continue;
+            }
+            if (c is '"' or '\'') { quote = c; continue; }
+            if (c == ';')
+            {
+                string statement = source[start..i].Trim();
+                if (statement.Length > 0) statements.Add(statement);
+                start = i + 1;
+            }
+        }
+        if (quote != '\0') throw new InvalidDataException("Cadena sin cerrar en el cuerpo de la función.");
+        if (!string.IsNullOrWhiteSpace(source[start..]))
+            throw new InvalidDataException("La última instrucción no termina en punto y coma.");
+        return statements;
+    }
+
+    private static int FindSimpleAssignment(string statement)
+    {
+        char quote = '\0';
+        for (int i = 0; i < statement.Length; i++)
+        {
+            char c = statement[i];
+            if (quote != '\0')
+            {
+                if (c == '\\\\' && i + 1 < statement.Length) { i++; continue; }
+                if (c == quote) quote = '\0';
+                continue;
+            }
+            if (c is '"' or '\'') { quote = c; continue; }
+            if (c != '=') continue;
+            char before = i > 0 ? statement[i - 1] : '\0';
+            char after = i + 1 < statement.Length ? statement[i + 1] : '\0';
+            if (before is '=' or '!' or '<' or '>' or '+' or '-' or '*' or '/' ||
+                after == '=')
+                continue;
+            return i;
+        }
+        return -1;
     }
 
     private static void WriteLiteral(Stream output, string expression, Func<string, int>? nameIndexResolver,
@@ -97,7 +185,7 @@ public static class UnrealScriptFunctionCompiler
             return;
         }
 
-        if (Regex.IsMatch(expression, @"^(?:default\\.)?[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        if (Regex.IsMatch(expression, @"^(?:default\.)?[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
         {
             if (variableResolver == null)
                 throw new NotSupportedException($"La variable '{expression}' requiere resolver su referencia de objeto.");
