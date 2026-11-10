@@ -11,8 +11,10 @@ static void Assert(bool condition, string message)
 
 static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
 {
+    owner.Load();
     foreach (var field in owner.EnumerateFields())
     {
+        field.Load();
         if (field is UFunction nestedFunction)
         {
             yield return nestedFunction;
