@@ -101,17 +101,21 @@ public static class UnrealScriptSourceIndex
             if (c == '/' && i + 1 < source.Length && source[i + 1] == '*')
             {
                 i += 2;
-                bool closed = false;
-                while (i < source.Length)
+                int commentDepth = 1;
+                while (i < source.Length && commentDepth > 0)
                 {
-                    if (source[i] == '\n') line++;
+                    if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '*')
+                    {
+                        commentDepth++; i += 2; continue;
+                    }
                     if (source[i] == '*' && i + 1 < source.Length && source[i + 1] == '/')
                     {
-                        i += 2; closed = true; break;
+                        commentDepth--; i += 2; continue;
                     }
+                    if (source[i] == '\n') line++;
                     i++;
                 }
-                if (!closed) throw new InvalidDataException("Comentario de bloque sin cerrar.");
+                if (commentDepth != 0) throw new InvalidDataException("Comentario de bloque sin cerrar.");
                 continue;
             }
             if (c == '#')
