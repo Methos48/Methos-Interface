@@ -248,6 +248,7 @@ public static class UnrealScriptFunctionDecompiler
 
     private static string Quote(string value)
     {
+        if (value == "\"") return "\"\"\"";
         if (value.Contains('\r') || value.Contains('\n'))
             throw new NotSupportedException("Cadena con saltos de línea no admitida en este subconjunto.");
         return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
