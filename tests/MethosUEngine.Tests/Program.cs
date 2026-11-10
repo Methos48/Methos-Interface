@@ -291,9 +291,9 @@ state Idle
     }
 }
 """;
-string tripleQuoteSource = """class Sample; function QuoteTest() { Call("\\""); }""";
+string tripleQuoteSource = """class Sample; function QuoteTest() { Call("\""); }""";
 Assert(UnrealScriptSourceIndex.ParseFunctions(tripleQuoteSource).Count == 1,
-    "Triple-quote literal confused the source scanner.");
+    "Escaped quote confused the source scanner.");
 
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
