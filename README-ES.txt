@@ -18,9 +18,12 @@ Coloca el entorno de compilación dentro de:
   Documentos\Methos U Editor\herramientas\
 o selecciónalo cuando el programa lo solicite.
 
-El compilador debe incluir UCC.exe, los paquetes Core, Engine, Fire, Editor y NWindow, y un archivo .ini válido.
-El programa trabaja sobre una copia temporal para no modificar tu compilador original.
+El compilador debe ser de Interlude y debe incluir UCC.exe, los paquetes Core, Engine, Fire, Editor y NWindow, y un archivo .ini válido.
+No sirve un UCC de otra crónica (C4, Gracia, High Five, etc.).
+El programa trabaja sobre una copia temporal: elimina allí cualquier Interface.u antiguo para obligar a UCC a recompilar, sin tocar tu compilador ni tus archivos originales.
+Antes de reemplazar el resultado, vuelve a abrir el .u generado y comprueba que contenga clases reconocibles.
 El resultado se guarda en "u completo". Si ya existe un archivo con ese nombre, se crea un backup.
+Si UCC falla o el archivo generado no supera la validación, el .u existente se conserva intacto.
 
 IMPORTANTE
 Prueba los paquetes compilados en una copia del cliente. No reemplaces tu Interface.u original sin guardar una copia.
