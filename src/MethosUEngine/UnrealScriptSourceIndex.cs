@@ -81,7 +81,7 @@ public static class UnrealScriptSourceIndex
         return functions;
     }
 
-    public sealed record ClosureRepair(string FunctionName, int Line, int ClosuresInserted);
+    public sealed record ClosureRepair(string FunctionName, int Line, int ClosuresInserted, int ClosuresRemoved = 0);
     public sealed record ClosureRepairResult(string Source, IReadOnlyList<ClosureRepair> Repairs);
 
     /// <summary>
@@ -118,10 +118,13 @@ public static class UnrealScriptSourceIndex
                 if (tokens[i].Text == "{") depth++;
                 else if (tokens[i].Text == "}")
                 {
-                    depth--;
-                    if (depth == 0) { closed = true; break; }
-                    if (depth < 0)
-                        throw new InvalidDataException($"La función '{header.Name}' tiene llaves de cierre sobrantes antes de la siguiente declaración.");
+                    if (depth > 0)
+                    {
+                        depth--;
+                        if (depth == 0) closed = true;
+                    }
+                    // An unmatched close is checked after missing closures have been repaired.
+                    // It may be a genuine state/defaultproperties terminator outside this function.
                 }
             }
 
@@ -136,6 +139,27 @@ public static class UnrealScriptSourceIndex
             string closing = Environment.NewLine + new string('}', item.Count) + Environment.NewLine;
             repaired = repaired.Insert(item.Offset, closing);
             repairs.Add(new ClosureRepair(item.Name, item.Line, item.Count));
+        }
+
+        // Remove only unmatched class-level closing braces immediately before a real
+        // declaration (or EOF). State and defaultproperties braces remain balanced.
+        List<Token> repairedTokens = Tokenize(repaired);
+        var orphanClosures = new List<(int Offset, int Line)>();
+        int globalDepth = 0;
+        for (int i = 0; i < repairedTokens.Count; i++)
+        {
+            if (repairedTokens[i].Text == "{") globalDepth++;
+            else if (repairedTokens[i].Text == "}")
+            {
+                if (globalDepth > 0) globalDepth--;
+                else if (i + 1 == repairedTokens.Count || IsDeclarationBoundary(repairedTokens, i + 1))
+                    orphanClosures.Add((repairedTokens[i].Start, repairedTokens[i].Line));
+            }
+        }
+        foreach (var orphan in orphanClosures.OrderByDescending(item => item.Offset))
+        {
+            repaired = repaired.Remove(orphan.Offset, 1);
+            repairs.Add(new ClosureRepair("orphan", orphan.Line, 0, 1));
         }
 
         // Fail closed if the repaired copy is still structurally incomplete.
