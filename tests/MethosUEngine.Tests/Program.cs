@@ -544,6 +544,30 @@ Assert(repairedFunctionNames.Count == 1 &&
        normalizedRepairedFunctionSource.Contains("return 7;", StringComparison.Ordinal),
     $"The failed-function repair did not restore only the broken function. Count={repairedFunctionNames.Count}; Names={string.Join(",", repairedFunctionNames)}; Source={repairedFunctionSource}");
 
+string decompiledTrailingReturnSource = """
+class ReturnRepairTest;
+function bool IsValid()
+{
+    if (Flag) return true;
+    return false;
+    return;
+}
+""";
+string referenceTrailingReturnSource = """
+class ReturnRepairTest;
+function bool IsValid()
+{
+    if (Flag) return true;
+    return false;
+}
+""";
+string repairedTrailingReturnSource = UnrealScriptFailedFunctionRepair.RestoreInvalidTrailingReturns(
+    decompiledTrailingReturnSource, referenceTrailingReturnSource, out var repairedTrailingReturnNames);
+Assert(repairedTrailingReturnNames.Count == 1 &&
+       !repairedTrailingReturnSource.Contains("return;", StringComparison.Ordinal) &&
+       repairedTrailingReturnSource.Contains("return false;", StringComparison.Ordinal),
+    "A decompiler-added empty return was not removed from a non-void function.");
+
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
 function SetStateAndShow(string State)
