@@ -474,7 +474,7 @@ if (args.Length > 0)
                 }
                 var export = realPackage.Exports[exportReference - 1];
                 long relativeOffset = function.ScriptOffset; // UELib's object stream is already relative to this export.
-                if (relativeOffset < 4 || relativeOffset > export.SerialSize - function.ScriptSize)
+                if (relativeOffset < 4 || relativeOffset > export.SerialSize - 4)
                 {
                     invalidFunctionOffsets++;
                     continue;
@@ -482,7 +482,7 @@ if (args.Length > 0)
                 int sizeFieldOffset = checked(export.SerialOffset + (int)relativeOffset - 4);
                 int declaredScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
                     originalPackageBytes.AsSpan(sizeFieldOffset, 4));
-                if (declaredScriptSize != function.ScriptSize)
+                if (declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize)
                 {
                     invalidFunctionOffsets++;
                     continue;
@@ -491,7 +491,7 @@ if (args.Length > 0)
                 try
                 {
                     _ = UnrealScriptFunctionDecompiler.DecompileExport(realPackage, exportReference,
-                        (int)relativeOffset, function.ScriptSize);
+                        (int)relativeOffset, declaredScriptSize);
                     nativeBytecodeDecoded++;
                 }
                 catch (NotSupportedException) { nativeBytecodeUnsupported++; }
