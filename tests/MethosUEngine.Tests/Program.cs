@@ -527,6 +527,20 @@ Assert(restoredCastCount == 1 &&
        restoredCastAssignment.Contains("Type = EActionCategory(tmp);", StringComparison.Ordinal),
     "Primitive byte cast was not restored to its original enum cast.");
 
+string decompiledNumericEnumCast = """
+class NumericEnumCastTest;
+function Test() { Type = 1; }
+""";
+string referenceNumericEnumCast = """
+class NumericEnumCastTest;
+function Test() { Type = EActionCategory(1); }
+""";
+string restoredNumericEnumCast = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+    decompiledNumericEnumCast, referenceNumericEnumCast, out int restoredNumericEnumCastCount);
+Assert(restoredNumericEnumCastCount == 1 &&
+       restoredNumericEnumCast.Contains("Type = EActionCategory(1);", StringComparison.Ordinal),
+    "Numeric enum value was not restored to its original enum cast.");
+
 string brokenFunctionSource = """
 class RepairTest;
 function int HealthyFunction() { return 7; }
