@@ -348,6 +348,70 @@ public static class UnrealScriptSourceIndex
         return headers;
     }
 
+    public sealed record RedundantReturnRepair(string FunctionName, int Line);
+    public sealed record ReturnNormalizationResult(string Source, IReadOnlyList<RedundantReturnRepair> Repairs);
+
+    /// <summary>
+    /// Removes a trailing bare return when the same top-level function body already
+    /// contains a preceding return statement. The trailing statement is unreachable.
+    /// </summary>
+    public static ReturnNormalizationResult RemoveRedundantTrailingReturns(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var edits = new List<(int Start, int Length, string Name, int Line)>();
+        foreach (var function in ParseFunctions(source))
+        {
+            string body = source.Substring(function.BodyOffset, function.BodyLength);
+            List<Token> tokens = Tokenize(body);
+            if (tokens.Count < 4) continue;
+
+            int lastReturn = tokens.Count - 2;
+            if (tokens[lastReturn].Kind != TokenKind.Identifier ||
+                !tokens[lastReturn].Text.Equals("return", StringComparison.OrdinalIgnoreCase) ||
+                tokens[lastReturn + 1].Text != ";")
+                continue;
+
+            int[] depths = new int[tokens.Count];
+            int depth = 0;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Text == "{") depth++;
+                else if (tokens[i].Text == "}") depth--;
+                depths[i] = depth;
+            }
+
+            int previousReturn = -1;
+            for (int i = lastReturn - 1; i >= 0; i--)
+            {
+                if (tokens[i].Kind == TokenKind.Identifier &&
+                    tokens[i].Text.Equals("return", StringComparison.OrdinalIgnoreCase) &&
+                    depths[i] == depths[lastReturn])
+                {
+                    previousReturn = i;
+                    break;
+                }
+            }
+
+            if (previousReturn < 0 || previousReturn + 1 >= lastReturn ||
+                tokens[previousReturn + 1].Text == ";")
+                continue;
+
+            int start = function.BodyOffset + tokens[lastReturn].Start;
+            int end = function.BodyOffset + tokens[lastReturn + 1].End;
+            edits.Add((start, end - start, function.Name, function.Line));
+        }
+
+        string normalized = source;
+        var repairs = new List<RedundantReturnRepair>(edits.Count);
+        foreach (var edit in edits.OrderByDescending(item => item.Start))
+        {
+            normalized = normalized.Remove(edit.Start, edit.Length);
+            repairs.Add(new RedundantReturnRepair(edit.Name, edit.Line));
+        }
+        repairs.Reverse();
+        return new ReturnNormalizationResult(normalized, repairs);
+    }
+
     private static List<Token> Tokenize(string source)
     {
         var tokens = new List<Token>();
