@@ -161,6 +161,8 @@ foreach (ushort profile in new ushort[] { 111, 121, 123, 126 })
         $"Classic UE package profile {profile} was not accepted.");
 }
 Assert(parsed.Summary.Version == 126 && parsed.Summary.LicenseeVersion == 0, "Version profile mismatch.");
+Assert(parsed.Summary.ProfileDescription.Contains("UE2 v126/0", StringComparison.Ordinal),
+    "Unknown v126/0 profile was incorrectly classified as Lineage II.");
 Assert(parsed.Names.SequenceEqual(new[] { "None", "TestClass" }), "Name table mismatch.");
 Assert(parsed.Exports.Count == 1 && parsed.Exports[0].SerialOffset == 64, "Export table mismatch.");
 
