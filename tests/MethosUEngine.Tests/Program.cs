@@ -220,6 +220,7 @@ function int Add(int A, int B)
     // } must not close the function
     local string S;
     S = "}";
+    S = "..\\L2text\\";
     if (A > 0) { return A + B; }
     /* } nested-looking comment */
     return 0;
@@ -235,6 +236,8 @@ state Idle
 """;
 var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
 Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
+Assert(indexedFunctions[0].Body.Contains("..\\\\L2text\\\\"),
+    "A path string ending in a backslash was not scanned as a closed string literal.");
 Assert(indexedFunctions[0].Name == "Add" && indexedFunctions[0].Body.Contains("return A + B"),
     "Function source indexer failed to extract the Add body.");
 Assert(indexedFunctions[1].Name == "BeginState" && indexedFunctions[1].Body.Contains("return;"),
