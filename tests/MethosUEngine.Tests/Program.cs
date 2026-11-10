@@ -448,6 +448,21 @@ Assert(normalizedClosureReturn.Source.Split("return", StringSplitOptions.None).L
 Assert(UnrealScriptSourceIndex.ParseFunctions(normalizedClosureReturn.Source).Count == 1,
     "The function with a redundant return did not parse after repair.");
 
+string sourceWithExtraTrailingBraces = """
+class ExtraClosures extends Object;
+function int GetValue()
+{
+    return 1;
+}
+}
+}
+""";
+var extraTrailingClosureRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceWithExtraTrailingBraces);
+Assert(extraTrailingClosureRepair.Repairs.Sum(item => item.ClosuresRemoved) == 2,
+    "Trailing orphan class braces were not removed safely.");
+Assert(UnrealScriptSourceIndex.ParseFunctions(extraTrailingClosureRepair.Source).Count == 1,
+    "A valid function terminator was removed while cleaning trailing orphan braces.");
+
 string brokenBeforeDefaults = """
 class BrokenDefaults extends Object;
 function First()
