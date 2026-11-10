@@ -303,8 +303,8 @@ foreach (ushort profile in new ushort[] { 111, 121, 123, 126 })
         $"Classic UE package profile {profile} was not accepted.");
 }
 Assert(parsed.Summary.Version == 126 && parsed.Summary.LicenseeVersion == 0, "Version profile mismatch.");
-Assert(parsed.Summary.ProfileDescription.Contains("UE2 v126/0", StringComparison.Ordinal),
-    "Unknown v126/0 profile was incorrectly classified as Lineage II.");
+Assert(parsed.Summary.ProfileDescription.Contains("Lineage II Interlude", StringComparison.Ordinal),
+    "The v126/0 Unreal2XMP package was not recognized as Lineage II Interlude.");
 Assert(parsed.Names.SequenceEqual(new[] { "None", "TestClass" }), "Name table mismatch.");
 Assert(parsed.ResolveObjectName(0) == "None" && parsed.ResolveObjectName(1) == "TestClass",
     "Native object-reference name resolution failed.");
