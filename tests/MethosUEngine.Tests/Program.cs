@@ -421,6 +421,7 @@ if (args.Length > 1)
     byte[] sourcePackageBytes = File.ReadAllBytes(args[0]);
     int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
     int verifiedNativeRoundTrips = 0, unsupportedNativeFunctions = 0;
+    bool realPackageFunctionPatchPassed = false;
     foreach (var entry in sourceFiles)
     {
         string sourceClassName = Path.GetFileNameWithoutExtension(entry.Name);
@@ -485,7 +486,22 @@ if (args.Length > 1)
                 byte[] nativeCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(nativeSource, ResolveName);
                 if (sourceCode.AsSpan().SequenceEqual(originalCode) &&
                     nativeCode.AsSpan().SequenceEqual(originalCode))
+                {
                     verifiedNativeRoundTrips++;
+                    if (!realPackageFunctionPatchPassed)
+                    {
+                        string minimalClassSource = $"class {sourceClassName}; function {sourceFunction.Name}() {{ {sourceFunction.Body} }}";
+                        var nativeCompile = UnrealScriptCompilerPipeline.CompileClassSource(
+                            minimalClassSource, sourcePackageIndex,
+                            new[] { new UnrealFunctionTarget(sourceFunction.Name, exportReference, relative, scriptSize) },
+                            repairMissingFunctionClosures: false);
+                        var rebuiltPackage = UnrealPackageIndex.Parse(nativeCompile.PackageBytes);
+                        Assert(rebuiltPackage.Exports.Count == sourcePackageIndex.Exports.Count &&
+                            rebuiltPackage.Imports.Count == sourcePackageIndex.Imports.Count,
+                            "Native compilation changed the package tables unexpectedly.");
+                        realPackageFunctionPatchPassed = true;
+                    }
+                }
             }
             catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
             {
@@ -495,6 +511,7 @@ if (args.Length > 1)
     }
     Console.WriteLine($"SOURCE MAP: matched classes={sourceClassMatches}/{sourceFiles.Length}; missing class files={missingClassFiles}; source functions without package target={missingFunctionMappings}; duplicate target names={duplicateFunctionTargets}.");
     Console.WriteLine($"NATIVE BYTECODE ROUNDTRIP: exact source+decompiler matches={verifiedNativeRoundTrips}; unsupported or non-literal functions={unsupportedNativeFunctions}.");
+    Console.WriteLine($"REAL PACKAGE FUNCTION PATCH: {(realPackageFunctionPatchPassed ? "PASS" : "no compatible function found in supplied sources")}.");
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
