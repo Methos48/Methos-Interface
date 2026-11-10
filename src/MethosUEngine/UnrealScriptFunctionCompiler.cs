@@ -278,7 +278,7 @@ public static class UnrealScriptFunctionCompiler
             char c = arguments[i];
             if (quote != '\0')
             {
-                if (c == '\\\\' && i + 1 < arguments.Length) { i++; continue; }
+                if (c == '\\' && i + 1 < arguments.Length) { i++; continue; }
                 if (c == quote) quote = '\0';
                 continue;
             }
