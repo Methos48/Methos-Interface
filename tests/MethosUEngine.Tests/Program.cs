@@ -154,6 +154,8 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             {
                 Console.WriteLine("UICommonAPI CURRENT CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "PlayConsoleSound"));
                 Console.WriteLine("UICommonAPI REFERENCE CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "PlayConsoleSound"));
+                Console.WriteLine("UICommonAPI CURRENT DEFAULT ACTION: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "SetDefaultAction"));
+                Console.WriteLine("UICommonAPI REFERENCE DEFAULT ACTION: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "SetDefaultAction"));
             }
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
                 normalized, referenceText, out int restoredCallsiteArguments);
