@@ -10,6 +10,7 @@ namespace MethosUEngine;
 /// </summary>
 public static class UnrealScriptFunctionDecompiler
 {
+    private readonly record struct DecodedExpression(string Text, byte Precedence);
     private const byte EX_LocalVariable = 0x00;
     private const byte EX_InstanceVariable = 0x01;
     private const byte EX_DefaultVariable = 0x02;
@@ -62,15 +63,15 @@ public static class UnrealScriptFunctionDecompiler
             }
             else if (token == EX_Return)
             {
-                string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
-                statements.Add($"return {expression};");
+                var expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
+                statements.Add($"return {expression.Text};");
                 sawReturn = true;
             }
             else if (token == EX_Let)
             {
-                string left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
-                string right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
-                statements.Add($"{left} = {right};");
+                var left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
+                var right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver, nativeResolver);
+                statements.Add($"{left.Text} = {right.Text};");
             }
             else
             {
@@ -110,11 +111,11 @@ public static class UnrealScriptFunctionDecompiler
         }, objectResolver ?? package.ResolveObjectName, nativeResolver);
     }
 
-    private static string ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver,
+    private static DecodedExpression ReadLiteral(byte[] data, ref int position, Func<int, string>? nameResolver,
         Func<int, string>? objectResolver, Func<ushort, UnrealScriptNativeFunction?>? nativeResolver)
     {
         byte token = ReadByte(data, ref position);
-        if (token >= EX_FirstNative || token >= EX_ExtendedNative && token < EX_FirstNative)
+        if (token >= EX_FirstNative || (token >= EX_ExtendedNative && token < EX_FirstNative))
             return ReadNativeExpression(data, ref position, token, nameResolver, objectResolver, nativeResolver);
         switch (token)
         {
@@ -125,39 +126,39 @@ public static class UnrealScriptFunctionDecompiler
                 int reference = ReadInt32(data, ref position);
                 string variable = objectResolver?.Invoke(reference)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para variables UnrealScript.");
-                return token == EX_DefaultVariable ? "default." + variable : variable;
+                return new DecodedExpression(token == EX_DefaultVariable ? "default." + variable : variable, byte.MaxValue);
             }
-            case EX_IntZero: return "0";
-            case EX_IntOne: return "1";
-            case EX_True: return "true";
-            case EX_False: return "false";
-            case EX_Self: return "self";
-            case EX_NoObject: return "none";
+            case EX_IntZero: return new DecodedExpression("0", byte.MaxValue);
+            case EX_IntOne: return new DecodedExpression("1", byte.MaxValue);
+            case EX_True: return new DecodedExpression("true", byte.MaxValue);
+            case EX_False: return new DecodedExpression("false", byte.MaxValue);
+            case EX_Self: return new DecodedExpression("self", byte.MaxValue);
+            case EX_NoObject: return new DecodedExpression("none", byte.MaxValue);
             case EX_IntConst:
-                return ReadInt32(data, ref position).ToString(CultureInfo.InvariantCulture);
+                return new DecodedExpression(ReadInt32(data, ref position).ToString(CultureInfo.InvariantCulture), byte.MaxValue);
             case EX_FloatConst:
             {
                 float value = BitConverter.Int32BitsToSingle(ReadInt32(data, ref position));
-                return value.ToString("R", CultureInfo.InvariantCulture) + "f";
+                return new DecodedExpression(value.ToString("R", CultureInfo.InvariantCulture) + "f", byte.MaxValue);
             }
             case EX_StringConst:
-                return Quote(ReadAnsiString(data, ref position));
+                return new DecodedExpression(Quote(ReadAnsiString(data, ref position)), byte.MaxValue);
             case EX_UnicodeStringConst:
-                return Quote(ReadUnicodeString(data, ref position));
+                return new DecodedExpression(Quote(ReadUnicodeString(data, ref position)), byte.MaxValue);
             case EX_NameConst:
             {
                 int index = ReadInt32(data, ref position);
                 string name = nameResolver?.Invoke(index)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para constantes Name.");
                 if (name.Contains("'")) throw new NotSupportedException("Name literal con apóstrofo no admitido en este subconjunto.");
-                return "'" + name + "'";
+                return new DecodedExpression("'" + name + "'", byte.MaxValue);
             }
             default:
                 throw new NotSupportedException($"Expresión de bytecode no admitida: 0x{token:X2}.");
         }
     }
 
-    private static string ReadNativeExpression(byte[] data, ref int position, byte firstToken,
+    private static DecodedExpression ReadNativeExpression(byte[] data, ref int position, byte firstToken,
         Func<int, string>? nameResolver, Func<int, string>? objectResolver,
         Func<ushort, UnrealScriptNativeFunction?>? nativeResolver)
     {
@@ -171,24 +172,28 @@ public static class UnrealScriptFunctionDecompiler
         {
             case UnrealScriptNativeFunctionKind.Operator:
             {
-                string left = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
-                string right = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                var left = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                var right = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 ExpectEndFunctionParms(data, ref position);
-                result = $"{left} {native.Name} {right}";
+                string leftText = left.Precedence < native.Precedence ? $"({left.Text})" : left.Text;
+                string rightText = right.Precedence <= native.Precedence ? $"({right.Text})" : right.Text;
+                result = $"{leftText} {native.Name} {rightText}";
                 break;
             }
             case UnrealScriptNativeFunctionKind.PreOperator:
             {
-                string operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                var operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 ExpectEndFunctionParms(data, ref position);
-                result = native.Name.All(char.IsLetter) ? native.Name + " " + operand : native.Name + operand;
+                string operandText = operand.Precedence < native.Precedence ? $"({operand.Text})" : operand.Text;
+                result = native.Name.All(char.IsLetter) ? native.Name + " " + operandText : native.Name + operandText;
                 break;
             }
             case UnrealScriptNativeFunctionKind.PostOperator:
             {
-                string operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
+                var operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 ExpectEndFunctionParms(data, ref position);
-                result = native.Name.All(char.IsLetter) ? operand + " " + native.Name : operand + native.Name;
+                string operandText = operand.Precedence < native.Precedence ? $"({operand.Text})" : operand.Text;
+                result = native.Name.All(char.IsLetter) ? operandText + " " + native.Name : operandText + native.Name;
                 break;
             }
             case UnrealScriptNativeFunctionKind.Function:
@@ -202,7 +207,7 @@ public static class UnrealScriptFunctionDecompiler
                         position++;
                         break;
                     }
-                    arguments.Add(ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver));
+                    arguments.Add(ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver).Text);
                 }
                 result = $"{native.Name}({string.Join(", ", arguments)})";
                 break;
@@ -210,7 +215,9 @@ public static class UnrealScriptFunctionDecompiler
             default:
                 throw new NotSupportedException($"Tipo de función nativa no admitido para 0x{token:X}.");
         }
-        return result;
+        byte precedence = native.Kind == UnrealScriptNativeFunctionKind.Function
+            ? byte.MaxValue : native.Precedence;
+        return new DecodedExpression(result, precedence);
     }
 
     private static void ExpectEndFunctionParms(byte[] data, ref int position)
