@@ -150,6 +150,12 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptFailedFunctionRepair.RestoreInvalidTrailingReturns(
                 normalized, referenceText, out var repairedTrailingReturns);
             totalNormalized += repairedTrailingReturns.Count;
+            if (Path.GetFileName(sourcePath).Equals("DeliverWnd.uc", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("DeliverWnd CURRENT DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(normalized, "DialogShow"));
+                Console.WriteLine("DeliverWnd REFERENCE DIALOG CALLS: " + UnrealScriptCallsiteArgumentRestorer.DescribeCallSites(referenceText, "DialogShow"));
+                Console.WriteLine($"DeliverWnd SYMBOLIC CALL ARGUMENTS RESTORED: {restoredCallsiteArguments}.");
+            }
             if (Path.GetFileName(sourcePath).Equals("AutoBuffWnd.uc", StringComparison.OrdinalIgnoreCase))
                 Console.WriteLine("AutoBuffWnd EMPTY RETURNS REMOVED: " + string.Join(",", repairedTrailingReturns));
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
@@ -466,19 +472,20 @@ Assert(dialogEnumCount == 1 &&
 string decompiledSoundCall = """
 class UICommonAPI;
 function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)
- script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(1); PlayConsoleSound(6); PlayConsoleSound(5); }
+ script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(1); DialogShow(6, MakeFullSystemMsg(GetSystemMessage(72), Info.Name, "")); PlayConsoleSound(6); PlayConsoleSound(5); }
 """;
 string referenceSoundCall = """
 class UICommonAPI;
 function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)
- script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(EDefaultOK); PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
+ script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(EDefaultOK); DialogShow(DIALOG_NumberPad, MakeFullSystemMsg(GetSystemMessage(72), Info.Name, "")); PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
 """;
 string restoredSoundCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
     decompiledSoundCall, referenceSoundCall, out int restoredSoundCount);
-Assert(restoredSoundCount == 3 &&
+Assert(restoredSoundCount == 4 &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal) &&
-       restoredSoundCall.Contains("script.SetDefaultAction(EDefaultOK)", StringComparison.Ordinal),
+       restoredSoundCall.Contains("script.SetDefaultAction(EDefaultOK)", StringComparison.Ordinal) &&
+       restoredSoundCall.Contains("DialogShow(DIALOG_NumberPad, MakeFullSystemMsg(GetSystemMessage(72), Info.Name, \"\")", StringComparison.Ordinal),
     "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
 
 string decompiledAssignmentSource = """
