@@ -401,12 +401,34 @@ string completedBranchThenReturn = "class ReturnTest; function string GetValue(b
 var completedBranchReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(completedBranchThenReturn);
 Assert(completedBranchReturns.Repairs.Count == 1,
     "A completed if block incorrectly prevented removal of a later unreachable return.");
-string decompiledEnumCall = "class EnumTest; function Test() { PlayConsoleSound(6); }";
-string referenceEnumCall = "class EnumTest; function Test() { PlayConsoleSound(IFST_WINDOW_CLOSE); }";
+string decompiledEnumCall = """
+class EnumTest;
+enum ESoundType { SOUND_OPEN, SOUND_CLOSE, SOUND_EXIT };
+function PlayConsoleSound(ESoundType soundType, string caption);
+function Test() { PlayConsoleSound(1, "close"); }
+""";
+string referenceEnumCall = """
+class EnumTest;
+enum ESoundType { SOUND_OPEN, SOUND_CLOSE, SOUND_EXIT };
+function PlayConsoleSound(ESoundType soundType, string caption);
+function Test() { PlayConsoleSound(SOUND_CLOSE, "close"); }
+""";
 string restoredEnumCall = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
     decompiledEnumCall, referenceEnumCall, out int restoredEnumCount);
-Assert(restoredEnumCount == 1 && restoredEnumCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal),
-    "A decompiled numeric enum argument was not restored from the reference source.");
+Assert(restoredEnumCount == 1 &&
+       restoredEnumCall.Contains("PlayConsoleSound(SOUND_CLOSE, \"close\")", StringComparison.Ordinal),
+    "A numeric enum argument in a multi-argument call was not restored.");
+string dialogEnumCall = """
+class UICommonAPI;
+enum ESilentDialogType { DIALOG_OKCancel, DIALOG_OK, DIALOG_OKCancelInput, DIALOG_OKInput, DIALOG_Warning, DIALOG_Notice, DIALOG_NumberPad, DIALOG_Progress, DIALOG_Block, DIALOG_Silent };
+function DialogShow(UICommonAPI.ESilentDialogType dialogType, string strMessage);
+function Test() { DialogShow(8, "message"); }
+""";
+string dialogEnumRestored = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
+    dialogEnumCall, dialogEnumCall, out int dialogEnumCount);
+Assert(dialogEnumCount == 1 &&
+       dialogEnumRestored.Contains("DialogShow(DIALOG_Block, \"message\")", StringComparison.Ordinal),
+    "DialogShow's numeric first argument was not restored to DIALOG_Block.");
 string brokenFunctionSource = """
 class RepairTest;
 function int HealthyFunction() { return 7; }
