@@ -141,10 +141,10 @@ public static class UnrealScriptSourceIndex
             repairs.Add(new ClosureRepair(item.Name, item.Line, item.Count));
         }
 
-        // Remove only unmatched class-level closing braces immediately before a real
-        // declaration (or EOF). State and defaultproperties braces remain balanced.
+        // Remove only unmatched closing braces at EOF. A global orphan-brace pass can
+        // mistake a valid function terminator for an orphan after an earlier bad scope.
         List<Token> repairedTokens = Tokenize(repaired);
-        var orphanClosures = new List<(int Offset, int Line)>();
+        var unmatchedClosures = new List<Token>();
         int globalDepth = 0;
         for (int i = 0; i < repairedTokens.Count; i++)
         {
@@ -152,12 +152,17 @@ public static class UnrealScriptSourceIndex
             else if (repairedTokens[i].Text == "}")
             {
                 if (globalDepth > 0) globalDepth--;
-                else orphanClosures.Add((repairedTokens[i].Start, repairedTokens[i].Line));
+                else unmatchedClosures.Add(repairedTokens[i]);
             }
         }
-        foreach (var orphan in orphanClosures.OrderByDescending(item => item.Offset))
+        int lastNonClose = repairedTokens.FindLastIndex(token => token.Text != "}");
+        var trailingOrphans = unmatchedClosures
+            .Where(token => repairedTokens.FindIndex(candidate => candidate.Start == token.Start) > lastNonClose)
+            .OrderByDescending(token => token.Start)
+            .ToArray();
+        foreach (var orphan in trailingOrphans)
         {
-            repaired = repaired.Remove(orphan.Offset, 1);
+            repaired = repaired.Remove(orphan.Start, 1);
             repairs.Add(new ClosureRepair("orphan", orphan.Line, 0, 1));
         }
 
