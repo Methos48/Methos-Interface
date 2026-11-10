@@ -8,9 +8,9 @@ namespace MethosUEngine;
 /// not represent missing statements.
 /// </summary>
 public static class UnrealScriptDecompilerDiagnosticCleaner
-        @"^[ \t]*// (?:Failed to format(?: remaining)? nests!:.*|[0-9]+ & Type:Switch Position:0x[0-9A-Fa-f]+)[ \t]*(?:\r?\n|$)",
+{
     private static readonly Regex DiagnosticLine = new(
-        @"^[ \\t]*// (?:Failed to format(?: remaining)? nests!:.*|[0-9]+ & Type:Switch Position:0x[0-9A-Fa-f]+)[ \\t]*(?:\\r?\\n|$)",
+        @"^[ \t]*// (?:Failed to format(?: remaining)? nests!:.*|[0-9]+ & Type:Switch Position:0x[0-9A-Fa-f]+)[ \t]*(?:\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     public static string RemoveOrphanedSwitchDiagnostics(string source, out int removedLines)
