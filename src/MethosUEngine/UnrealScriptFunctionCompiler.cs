@@ -153,7 +153,7 @@ public static class UnrealScriptFunctionCompiler
                 {
                     char c = source[i++];
                     output.Append(c);
-                    if (c == '\\\\' && i < source.Length)
+                    if (c == '\\' && i < source.Length)
                     {
                         output.Append(source[i++]);
                         continue;
@@ -196,7 +196,7 @@ public static class UnrealScriptFunctionCompiler
         var output = new StringBuilder(value.Length);
         for (int i = 0; i < value.Length; i++)
         {
-            if (value[i] != '\\\\' || i + 1 >= value.Length)
+            if (value[i] != '\\' || i + 1 >= value.Length)
             {
                 output.Append(value[i]);
                 continue;
@@ -204,15 +204,15 @@ public static class UnrealScriptFunctionCompiler
             char escaped = value[++i];
             output.Append(escaped switch
             {
-                'n' => '\\n',
-                'r' => '\\r',
-                't' => '\\t',
-                'b' => '\\b',
-                'f' => '\\f',
-                'v' => '\\v',
-                '\\\\' => '\\\\',
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                'b' => '\b',
+                'f' => '\f',
+                'v' => '\v',
+                '\\' => '\\',
                 '"' => '"',
-                '\\'' => '\\'',
+                '\'' => '\'',
                 _ => escaped
             });
         }
