@@ -1,8 +1,6 @@
 name: Methos U Editor - Analisis y compilacion Windows
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
