@@ -567,6 +567,24 @@ Assert(repairedTrailingReturnNames.Count == 1 &&
        !repairedTrailingReturnSource.Contains("return;", StringComparison.Ordinal) &&
        repairedTrailingReturnSource.Contains("return false;", StringComparison.Ordinal),
     "A decompiler-added empty return was not removed from a non-void function.");
+string overNestedFunctionSource = "class NestingRepairTest; function bool Check() {";
+for (int nesting = 0; nesting < 12; nesting++)
+    overNestedFunctionSource += "if (Flag) { return true; } else {";
+overNestedFunctionSource += "return false;";
+for (int nesting = 0; nesting < 12; nesting++)
+    overNestedFunctionSource += "}";
+overNestedFunctionSource += "}";
+string referenceNestingFunctionSource = """
+class NestingRepairTest;
+function bool Check() { if (Flag) return true; return false; }
+""";
+string repairedNestingFunctionSource = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
+    overNestedFunctionSource, referenceNestingFunctionSource, out var repairedNestingFunctions);
+Assert(repairedNestingFunctions.Count == 1 &&
+       repairedNestingFunctions[0] == "Check" &&
+       repairedNestingFunctionSource.Contains("if (Flag) return true;", StringComparison.Ordinal),
+    "An excessively nested decompiled function was not restored from its original structure.");
+
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
