@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 using UELib;
+using UELib.Core;
 
 namespace MethosUEditor;
 
@@ -177,7 +178,7 @@ internal sealed class MainForm : Form
         using var package = UnrealLoader.LoadPackage(path, FileAccess.Read);
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage(UnrealPackage.InitFlags.Construct | UnrealPackage.InitFlags.RegisterClasses);
-        var classes = package.Objects.Where(o => (int)o > 0 && string.Equals(o.Class?.Name?.ToString(), "Class", StringComparison.OrdinalIgnoreCase)).ToList();
+        var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
         int ok = 0, failed = 0;
         foreach (var obj in classes)
         {
