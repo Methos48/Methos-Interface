@@ -107,6 +107,36 @@ Assert(reparsed.Exports.SequenceEqual(parsed.Exports), "Exports changed after ro
 Assert(rebuilt.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }), "Opaque object payload moved or changed.");
 Assert(rebuilt.Length > fixture.Length, "Round-trip tables were not appended.");
 
+string sampleSource = """
+class Sample extends Object;
+
+native function int NativeCall(int A);
+
+function int Add(int A, int B)
+{
+    // } must not close the function
+    local string S;
+    S = "}";
+    if (A > 0) { return A + B; }
+    /* } nested-looking comment */
+    return 0;
+}
+
+state Idle
+{
+    event BeginState()
+    {
+        return;
+    }
+}
+""";
+var indexedFunctions = UnrealScriptSourceIndex.ParseFunctions(sampleSource);
+Assert(indexedFunctions.Count == 2, "Function source indexer found an incorrect number of bodies.");
+Assert(indexedFunctions[0].Name == "Add" && indexedFunctions[0].Body.Contains("return A + B"),
+    "Function source indexer failed to extract the Add body.");
+Assert(indexedFunctions[1].Name == "BeginState" && indexedFunctions[1].Body.Contains("return;"),
+    "Function source indexer failed to extract a state event body.");
+
 byte[] originalFunctionPayload = { 0xAA, 0xBB, 3, 0, 0, 0, 0x10, 0x20, 0x30, 0xCC, 0xDD };
 byte[] newFunctionCode = { 0x99, 0x88 };
 byte[] patchedFunctionPayload = UnrealScriptPatcher.ReplaceBytecode(
