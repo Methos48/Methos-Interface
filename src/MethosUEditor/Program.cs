@@ -211,9 +211,12 @@ internal sealed class MainForm : Form
         var ucc = FindTool("UCC.exe");
         if (ucc == null)
         {
-            using var d = new OpenFileDialog { Filter = "Compilador Unreal (UCC.exe)|UCC.exe", Title = "Selecciona UCC.exe del compilador Lineage II" };
-            if (d.ShowDialog() != DialogResult.OK) throw new FileNotFoundException("Para compilar se necesita UCC.exe, incluido en un entorno de compilación compatible con Lineage II.");
-            ucc = d.FileName;
+            ucc = (string?)Invoke(new Func<string?>(() =>
+            {
+                using var d = new OpenFileDialog { Filter = "Compilador Unreal (UCC.exe)|UCC.exe", Title = "Selecciona UCC.exe del compilador Lineage II" };
+                return d.ShowDialog() == DialogResult.OK ? d.FileName : null;
+            }));
+            if (string.IsNullOrWhiteSpace(ucc)) throw new FileNotFoundException("Para compilar se necesita UCC.exe, incluido en un entorno de compilación compatible con Lineage II.");
         }
         var systemDir = Path.GetDirectoryName(ucc)!;
         var root = Directory.GetParent(systemDir)?.FullName ?? throw new InvalidOperationException("No se pudo identificar la carpeta raíz del compilador.");
