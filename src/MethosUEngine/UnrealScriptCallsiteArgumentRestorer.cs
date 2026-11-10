@@ -206,34 +206,61 @@ public static class UnrealScriptCallsiteArgumentRestorer
     private static bool[] BuildCodeMask(string source)
     {
         var mask = new bool[source.Length];
-        for (int i = 0; i < source.Length;)
+        bool inString = false, inLineComment = false, inBlockComment = false;
+        char quote = '\0';
+
+        for (int i = 0; i < source.Length; i++)
         {
-            char c = source[i];
-            if (c is '"' or '\'')
+            char current = source[i];
+            char next = i + 1 < source.Length ? source[i + 1] : '\0';
+
+            if (inLineComment)
             {
-                char quote = c;
-                while (++i < source.Length)
+                if (current == '\n') inLineComment = false;
+                continue;
+            }
+            if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
                 {
-                    if (source[i] == '\\' && i + 1 < source.Length) { i++; continue; }
-                    if (source[i++] == quote) break;
+                    inBlockComment = false;
+                    i++;
                 }
                 continue;
             }
-            if (i + 1 < source.Length && c == '/' && source[i + 1] == '/')
+            if (inString)
             {
-                i += 2;
-                while (i < source.Length && source[i] != '\n') i++;
+                if (current == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (current == quote) inString = false;
                 continue;
             }
-            if (i + 1 < source.Length && c == '/' && source[i + 1] == '*')
+
+            if (current == '/' && next == '/')
             {
-                i += 2;
-                int commentEnd = source.IndexOf("*/", i, StringComparison.Ordinal);
-                i = commentEnd < 0 ? source.Length : commentEnd + 2;
+                inLineComment = true;
+                i++;
                 continue;
             }
-            mask[i++] = true;
+            if (current == '/' && next == '*')
+            {
+                inBlockComment = true;
+                i++;
+                continue;
+            }
+            if (current is '"' or '\'')
+            {
+                inString = true;
+                quote = current;
+                continue;
+            }
+
+            mask[i] = true;
         }
+
         return mask;
     }
 }
