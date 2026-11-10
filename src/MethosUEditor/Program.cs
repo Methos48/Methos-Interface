@@ -260,10 +260,6 @@ internal sealed class MainForm : Form
             try
             {
                 var source = obj.Decompile();
-                var returnNormalization = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(source);
-                source = returnNormalization.Source;
-                if (returnNormalization.Repairs.Count > 0)
-                    Log($"Retornos redundantes eliminados en {obj.Name}: {returnNormalization.Repairs.Count}.");
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
 
@@ -287,6 +283,18 @@ internal sealed class MainForm : Form
                 catch (Exception repairError)
                 {
                     Log($"Aviso: no se pudo verificar/reparar la estructura de {safeName}.uc; se conserva la salida original. {repairError.Message}");
+                }
+
+                try
+                {
+                    var returnNormalization = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(source);
+                    source = returnNormalization.Source;
+                    if (returnNormalization.Repairs.Count > 0)
+                        Log($"Retornos redundantes eliminados en {safeName}: {returnNormalization.Repairs.Count}.");
+                }
+                catch (Exception normalizationError)
+                {
+                    Log($"Aviso: no se pudo normalizar retornos en {safeName}.uc. {normalizationError.Message}");
                 }
 
                 if (nativeIndex != null)
