@@ -150,6 +150,13 @@ public static class UnrealScriptSourceIndex
         int i = 0;
         while (i < source.Length)
         {
+            if (source[i] == '"' && i + 2 < source.Length &&
+                source[i + 1] == '"' && source[i + 2] == '"')
+            {
+                output.Append("\"\"\"");
+                i += 3;
+                continue;
+            }
             if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '/')
             {
                 while (i < source.Length && source[i] != '\n') output.Append(source[i++]);
@@ -300,6 +307,14 @@ public static class UnrealScriptSourceIndex
             if (c == '#')
             {
                 while (i < source.Length && source[i] != '\n') i++;
+                continue;
+            }
+            if (c == '"' && i + 2 < source.Length &&
+                source[i + 1] == '"' && source[i + 2] == '"')
+            {
+                int start = i;
+                i += 3;
+                tokens.Add(new Token(source[start..i], TokenKind.Literal, start, i, line));
                 continue;
             }
             if (c is '"' or '\'')
