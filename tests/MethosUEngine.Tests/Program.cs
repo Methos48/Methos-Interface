@@ -424,6 +424,16 @@ Assert(patchedFunctionPayload.AsSpan(6, 2).SequenceEqual(newFunctionCode),
     "Function bytecode was not replaced.");
 Assert(patchedFunctionPayload.AsSpan(8).SequenceEqual(new byte[] { 0xCC, 0xDD }),
     "Function suffix changed during bytecode replacement.");
+byte[] oversizedDeclaredPayload = { 0xAA, 0xBB, 5, 0, 0, 0, 0x3A, 0x47, 0x11, 0x22, 0x33 };
+byte[] replacementReturnCode = { 0x04, 0x26, 0x47 };
+byte[] patchedOversizedPayload = UnrealScriptPatcher.ReplaceBytecode(
+    oversizedDeclaredPayload, 126, 6, declaredScriptSize: 5, actualScriptSize: 2,
+    newBytecode: replacementReturnCode);
+Assert(BinaryPrimitives.ReadInt32LittleEndian(patchedOversizedPayload.AsSpan(2, 4)) == 3 &&
+    patchedOversizedPayload.AsSpan(6, 3).SequenceEqual(replacementReturnCode) &&
+    patchedOversizedPayload.AsSpan(9).SequenceEqual(new byte[] { 0x11, 0x22, 0x33 }),
+    "Patcher did not preserve export suffix when declared and actual script sizes differ.");
+
 
 var replacementBuilder = new UnrealPackageBuilder(parsed);
 byte[] replacementPayload = { 0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x02 };
