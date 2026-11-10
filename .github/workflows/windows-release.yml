@@ -147,6 +147,7 @@ jobs:
             $prefix = "Compilador  U/"
             $runtimeRoot = Join-Path $PWD "publish\UccRuntime"
             foreach ($entry in $zip.Entries) {
+              if ($entry.FullName.EndsWith("/")) { continue }
               $relative = $null
               if ($entry.FullName.StartsWith($prefix + "Interlude/System/", [StringComparison]::OrdinalIgnoreCase)) {
                 $relative = $entry.FullName.Substring($prefix.Length)
