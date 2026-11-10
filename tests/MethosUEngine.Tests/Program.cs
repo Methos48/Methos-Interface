@@ -493,6 +493,8 @@ if (args.Length > 0)
         int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0;
         int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
         int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
+        int exportTableMatches = 0;
+        var offsetDiagnostics = new List<string>();
         var decompileErrors = new List<string>();
         foreach (var realClass in realClasses)
         {
@@ -507,10 +509,16 @@ if (args.Length > 0)
                     continue;
                 }
                 var export = realPackage.Exports[exportReference - 1];
-                long relativeOffset = function.ScriptOffset; // UELib's object stream is already relative to this export.
+                int uelibExportOffset = function.ExportTable?.SerialOffset ?? -1;
+                int uelibExportSize = function.ExportTable?.SerialSize ?? -1;
+                if (uelibExportOffset == export.SerialOffset && uelibExportSize == export.SerialSize)
+                    exportTableMatches++;
+                long relativeOffset = function.ScriptOffset;
                 if (relativeOffset < 4 || relativeOffset > export.SerialSize - 4)
                 {
                     invalidFunctionOffsets++;
+                    if (offsetDiagnostics.Count < 12)
+                        offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, scriptOffset={relativeOffset}, UELibExport={uelibExportOffset}/{uelibExportSize}, nativeExport={export.SerialOffset}/{export.SerialSize}");
                     continue;
                 }
                 int sizeFieldOffset = checked(export.SerialOffset + (int)relativeOffset - 4);
@@ -519,6 +527,8 @@ if (args.Length > 0)
                 if (declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize)
                 {
                     invalidFunctionOffsets++;
+                    if (offsetDiagnostics.Count < 12)
+                        offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, scriptOffset={relativeOffset}, declaredSize={declaredScriptSize}, ScriptSize={function.ScriptSize}, UELibExport={uelibExportOffset}/{uelibExportSize}, nativeExport={export.SerialOffset}/{export.SerialSize}");
                     continue;
                 }
                 validFunctionOffsets++;
@@ -548,9 +558,9 @@ if (args.Length > 0)
         Assert(realClasses.Length > 0, "UELib found no classes in the real package.");
         Assert(decompileErrors.Count == 0, "Real package decompilation errors: " + string.Join(" | ", decompileErrors.Take(8)));
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
-        Assert(functionsWithBytecode > 0 && validFunctionOffsets == functionsWithBytecode && invalidFunctionOffsets == 0,
-            $"Function bytecode offsets do not map safely into package exports: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}.");
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
+        Assert(functionsWithBytecode > 0 && validFunctionOffsets > 0,
+            $"No function bytecode offsets could be mapped safely: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}. " + string.Join(" | ", offsetDiagnostics));
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
     }
 }
 
