@@ -293,7 +293,7 @@ if (args.Length > 1)
     var sourceFiles = archive.Entries
         .Where(entry => entry.FullName.EndsWith(".uc", StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    int indexedFunctions = 0;
+    int totalIndexedFunctions = 0;
     var sourceErrors = new List<string>();
     foreach (var entry in sourceFiles)
     {
@@ -301,7 +301,7 @@ if (args.Length > 1)
         {
             using var stream = entry.Open();
             using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
-            indexedFunctions += UnrealScriptSourceIndex.ParseFunctions(reader.ReadToEnd()).Count;
+            totalIndexedFunctions += UnrealScriptSourceIndex.ParseFunctions(reader.ReadToEnd()).Count;
         }
         catch (Exception ex)
         {
@@ -310,5 +310,5 @@ if (args.Length > 1)
     }
     Assert(sourceFiles.Length > 0, "No .uc source files were found in the source archive.");
     Assert(sourceErrors.Count == 0, "Source indexing errors: " + string.Join(" | ", sourceErrors.Take(10)));
-    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {indexedFunctions} function bodies.");
+    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies.");
 }
