@@ -368,9 +368,8 @@ internal sealed class MainForm : Form
 
             var sourceFunctionNames = sourceFunctions.Select(function => function.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var ownedFunctions = metadataPackage.Objects.OfType<UFunction>()
-                .Where(function => IsOwnedByClass(function, classObject) &&
-                    sourceFunctionNames.Contains(function.Name.ToString())).ToList();
+            var ownedFunctions = EnumerateClassFunctions(classObject)
+                .Where(function => sourceFunctionNames.Contains(function.Name.ToString())).ToList();
             var targets = new List<UnrealFunctionTarget>();
             foreach (var function in ownedFunctions)
             {
