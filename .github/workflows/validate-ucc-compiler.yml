@@ -49,6 +49,26 @@ jobs:
           $output = Join-Path $env:KIT "Testar\system\Interface.u"
           & $validator -PackagePath $output
 
+      - name: Descompilar el Interface.u real para probar el recorrido completo
+        shell: pwsh
+        run: |
+          $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
+          if (Test-Path -LiteralPath $sourceDir) { Get-ChildItem -LiteralPath $sourceDir -File -Filter "*.uc" | Remove-Item -Force }
+          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --export-sources Interface.u $sourceDir
+          if ($LASTEXITCODE -ne 0) { throw "No se pudieron extraer todas las clases de Interface.u." }
+          $count = (Get-ChildItem -LiteralPath $sourceDir -File -Filter "*.uc").Count
+          if ($count -lt 150) { throw "Se exportaron muy pocas clases ($count)." }
+          Write-Host "Fuentes extraídas del Interface.u real: $count clases."
+
+      - name: Recompilar las fuentes extraídas del Interface.u real con UCC
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:KIT "Compilar.ps1")
+          if ($LASTEXITCODE -ne 0) { throw "UCC no pudo recompilar las fuentes extraídas de Interface.u." }
+          $output = Join-Path $env:KIT "Testar\system\Interface.u"
+          if (!(Test-Path -LiteralPath $output)) { throw "No se generó el Interface.u recompilado." }
+          & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
+
       - name: Comparar con Interface.u original y registrar hashes
         shell: pwsh
         run: |
