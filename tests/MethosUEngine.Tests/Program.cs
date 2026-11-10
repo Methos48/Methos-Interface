@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.IO.Compression;
 using MethosUEngine;
 
 static void Assert(bool condition, string message)
@@ -283,4 +284,31 @@ if (args.Length > 0)
     Assert(realRoundTrip.Imports.SequenceEqual(realPackage.Imports), "Real package import table changed during round trip.");
     Assert(realRoundTrip.Exports.SequenceEqual(realPackage.Exports), "Real package export table changed during round trip.");
     Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}.");
+}
+
+if (args.Length > 1)
+{
+    string sourceZipPath = args[1];
+    using var archive = ZipFile.OpenRead(sourceZipPath);
+    var sourceFiles = archive.Entries
+        .Where(entry => entry.FullName.EndsWith(".uc", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+    int indexedFunctions = 0;
+    var sourceErrors = new List<string>();
+    foreach (var entry in sourceFiles)
+    {
+        try
+        {
+            using var stream = entry.Open();
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
+            indexedFunctions += UnrealScriptSourceIndex.ParseFunctions(reader.ReadToEnd()).Count;
+        }
+        catch (Exception ex)
+        {
+            sourceErrors.Add($"{entry.FullName}: {ex.Message}");
+        }
+    }
+    Assert(sourceFiles.Length > 0, "No .uc source files were found in the source archive.");
+    Assert(sourceErrors.Count == 0, "Source indexing errors: " + string.Join(" | ", sourceErrors.Take(10)));
+    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {indexedFunctions} function bodies.");
 }
