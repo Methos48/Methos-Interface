@@ -202,19 +202,22 @@ public static class UnrealScriptFunctionCompiler
                 continue;
             }
             char escaped = value[++i];
-            output.Append(escaped switch
+            switch (escaped)
             {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                'b' => '\b',
-                'f' => '\f',
-                'v' => '\v',
-                '\\' => '\\',
-                '"' => '"',
-                '\'' => '\'',
-                _ => escaped
-            });
+                case 'n': output.Append('\n'); break;
+                case 'r': output.Append('\r'); break;
+                case 't': output.Append('\t'); break;
+                case 'b': output.Append('\b'); break;
+                case 'f': output.Append('\f'); break;
+                case 'v': output.Append('\v'); break;
+                case '\\': output.Append('\\'); break;
+                case '"': output.Append('"'); break;
+                case '\'': output.Append('\''); break;
+                default:
+                    output.Append('\\');
+                    output.Append(escaped);
+                    break;
+            }
         }
         return output.ToString();
     }
