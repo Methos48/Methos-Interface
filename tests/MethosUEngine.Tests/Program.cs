@@ -401,6 +401,57 @@ if (args.Length > 0)
         $"No UFunction bytecode offsets validated (objects={packageFunctions.Length}, invalid={invalidFunctionOffsets}).");
     Console.WriteLine($"UELib metadata bridge: classes={packageClasses.Count}, functions={packageFunctions.Length}, bytecode offsets validated={checkedFunctionOffsets}, functions without a usable serialized bytecode span={invalidFunctionOffsets} (native/declaration-only entries are expected).");
 
+    int nativePackageRoundTrips = 0, nativePackageUnsupported = 0;
+    bool realPackageFunctionPatchPassed = false;
+    foreach (var function in packageFunctions)
+    {
+        if (function.ExportTable == null) continue;
+        int exportReference = (int)function;
+        if (exportReference < 1 || exportReference > realPackage.Exports.Count) continue;
+        var export = realPackage.Exports[exportReference - 1];
+        long relativeLong = function.ScriptOffset;
+        if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
+        int relative = (int)relativeLong;
+        int sizeOffset = export.SerialOffset + relative - 4;
+        int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeOffset, 4));
+        if (scriptSize <= 0 || relative > export.SerialSize - scriptSize) continue;
+        try
+        {
+            byte[] originalCode = packageFileBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
+            string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
+                realPackage, exportReference, relative, scriptSize);
+            int ResolvePackageName(string name)
+            {
+                for (int index = 0; index < realPackage.Names.Count; index++)
+                    if (string.Equals(realPackage.Names[index], name, StringComparison.OrdinalIgnoreCase))
+                        return index;
+                throw new InvalidDataException($"Name not found: {name}");
+            }
+            byte[] rebuiltCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(nativeSource, ResolvePackageName);
+            if (!rebuiltCode.AsSpan().SequenceEqual(originalCode)) continue;
+            nativePackageRoundTrips++;
+            if (!realPackageFunctionPatchPassed)
+            {
+                string syntheticClass = $"class MethosNativeProbe; function {function.Name}() {{ {nativeSource} }}";
+                var patched = UnrealScriptCompilerPipeline.CompileClassSource(
+                    syntheticClass, realPackage,
+                    new[] { new UnrealFunctionTarget(function.Name.ToString(), exportReference, relative, scriptSize) },
+                    repairMissingFunctionClosures: false);
+                var patchedIndex = UnrealPackageIndex.Parse(patched.PackageBytes);
+                Assert(patchedIndex.Exports.Count == realPackage.Exports.Count &&
+                    patchedIndex.Imports.Count == realPackage.Imports.Count,
+                    "Native compiler could not patch a real Interface.u function without changing package tables.");
+                realPackageFunctionPatchPassed = true;
+            }
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
+        {
+            nativePackageUnsupported++;
+        }
+    }
+    Console.WriteLine($"NATIVE PACKAGE BYTECODE: exact return-only round trips={nativePackageRoundTrips}; unsupported bytecode={nativePackageUnsupported}.");
+    Console.WriteLine($"REAL PACKAGE BYTECODE PATCH: {(realPackageFunctionPatchPassed ? "PASS" : "no return-only function found")}.");
+
 }
 
 if (args.Length > 1)
