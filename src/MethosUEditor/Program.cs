@@ -276,7 +276,7 @@ internal sealed class MainForm : Form
             int exportReference = (int)function;
             if (exportReference < 1 || exportReference > packageIndex.Exports.Count) continue;
             var export = packageIndex.Exports[exportReference - 1];
-            long relativeLong = function.ScriptOffset - function.ExportTable.SerialOffset;
+            long relativeLong = function.ScriptOffset;
             if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
             int relative = (int)relativeLong;
             int sizeOffset = checked(export.SerialOffset + relative - 4);
@@ -378,7 +378,7 @@ internal sealed class MainForm : Form
                 if (exportReference < 1 || exportReference > nativePackage.Exports.Count)
                     throw new InvalidDataException($"La referencia de export de '{className}.{function.Name}' no es válida.");
                 var exportEntry = nativePackage.Exports[exportReference - 1];
-                long relativeOffset = function.ScriptOffset - function.ExportTable.SerialOffset;
+                long relativeOffset = function.ScriptOffset;
                 if (relativeOffset < 4 || relativeOffset > int.MaxValue ||
                     relativeOffset > exportEntry.SerialSize - 4)
                     throw new InvalidDataException($"La posición del bytecode de '{className}.{function.Name}' no es válida.");
