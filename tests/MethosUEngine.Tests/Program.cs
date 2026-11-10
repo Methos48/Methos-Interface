@@ -429,6 +429,21 @@ string dialogEnumRestored = UnrealScriptReferenceNormalizer.RestoreEnumArguments
 Assert(dialogEnumCount == 1 &&
        dialogEnumRestored.Contains("DialogShow(DIALOG_Block, \"message\")", StringComparison.Ordinal),
     "DialogShow's numeric first argument was not restored to DIALOG_Block.");
+string decompiledSoundCall = """
+class UICommonAPI;
+function Test() { PlayConsoleSound(6); PlayConsoleSound(5); }
+""";
+string referenceSoundCall = """
+class UICommonAPI;
+function Test() { PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
+""";
+string restoredSoundCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
+    decompiledSoundCall, referenceSoundCall, out int restoredSoundCount);
+Assert(restoredSoundCount == 2 &&
+       restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal) &&
+       restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal),
+    "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
+
 string brokenFunctionSource = """
 class RepairTest;
 function int HealthyFunction() { return 7; }
