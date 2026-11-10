@@ -200,10 +200,10 @@ Assert(assignmentSource.Replace("\r\n", "\n") == "Health = LocalValue;\nreturn H
     "Variable assignment and return source/bytecode round trip failed.");
 var nativeOperators = new[]
 {
-    new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 10),
-    new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 20),
-    new UnrealScriptNativeFunction(0x72, "-", UnrealScriptNativeFunctionKind.PreOperator, 30),
-    new UnrealScriptNativeFunction(0x73, "++", UnrealScriptNativeFunctionKind.PostOperator, 30),
+    new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 20),
+    new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 10),
+    new UnrealScriptNativeFunction(0x72, "-", UnrealScriptNativeFunctionKind.PreOperator, 0),
+    new UnrealScriptNativeFunction(0x73, "++", UnrealScriptNativeFunctionKind.PostOperator, 0),
     new UnrealScriptNativeFunction(0x74, "Abs", UnrealScriptNativeFunctionKind.Function),
     new UnrealScriptNativeFunction(0x75, "Max", UnrealScriptNativeFunctionKind.Function)
 };
