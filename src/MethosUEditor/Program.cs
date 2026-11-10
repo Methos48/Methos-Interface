@@ -113,7 +113,7 @@ internal sealed class MainForm : Form
             string zipBase = Path.GetFileNameWithoutExtension(d.FileName);
             var interfaceSources = archive.Entries.Where(entry =>
             {
-                string normalized = entry.FullName.Replace('\\\\', '/');
+                string normalized = entry.FullName.Replace('\\', '/');
                 return entry.Name.EndsWith(".uc", StringComparison.OrdinalIgnoreCase) &&
                     normalized.Contains("/Interface/Classes/", StringComparison.OrdinalIgnoreCase);
             }).ToArray();
@@ -137,7 +137,7 @@ internal sealed class MainForm : Form
 
             var packageEntries = archive.Entries
                 .Where(entry => entry.Name.EndsWith(".u", StringComparison.OrdinalIgnoreCase) &&
-                    entry.FullName.Replace('\\\\', '/').Contains("/System/", StringComparison.OrdinalIgnoreCase))
+                    entry.FullName.Replace('\\', '/').Contains("/System/", StringComparison.OrdinalIgnoreCase))
                 .GroupBy(entry => Path.GetFileName(entry.Name), StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.OrderByDescending(entry =>
                     entry.FullName.Contains("/Testar/system/", StringComparison.OrdinalIgnoreCase)).First())
