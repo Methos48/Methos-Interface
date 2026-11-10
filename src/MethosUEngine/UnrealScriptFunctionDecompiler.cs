@@ -137,8 +137,9 @@ public static class UnrealScriptFunctionDecompiler
 
     private static string Quote(string value)
     {
+        if (value == "\"") return "\"\"\"";
         if (value.Contains('"') || value.Contains('\r') || value.Contains('\n'))
-            throw new NotSupportedException("Cadena con comillas o saltos de línea no admitida en este subconjunto.");
+            throw new NotSupportedException("Cadena con comillas múltiples o saltos de línea no admitida en este subconjunto.");
         return "\"" + value + "\"";
     }
 
