@@ -41,6 +41,67 @@ public static class UnrealScriptFailedFunctionRepair
         return result;
     }
 
+    public static string RestoreInvalidTrailingReturns(string decompiledSource, string referenceSource,
+        out IReadOnlyList<string> repairedFunctions)
+    {
+        ArgumentNullException.ThrowIfNull(decompiledSource);
+        ArgumentNullException.ThrowIfNull(referenceSource);
+        var repaired = new List<string>();
+        IReadOnlyList<UnrealFunctionSource> currentFunctions;
+        IReadOnlyList<UnrealFunctionSource> referenceFunctions;
+        try
+        {
+            currentFunctions = UnrealScriptSourceIndex.ParseFunctions(decompiledSource);
+            referenceFunctions = UnrealScriptSourceIndex.ParseFunctions(referenceSource);
+        }
+        catch (InvalidDataException)
+        {
+            repairedFunctions = repaired;
+            return decompiledSource;
+        }
+
+        var referenceGroups = referenceFunctions.GroupBy(function => function.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var currentGroups = currentFunctions.GroupBy(function => function.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var edits = new List<(int Start, int Length)>();
+
+        foreach (var function in currentFunctions)
+        {
+            if (!currentGroups.TryGetValue(function.Name, out var currentMatches) || currentMatches.Length != 1 ||
+                !referenceGroups.TryGetValue(function.Name, out var referenceMatches) || referenceMatches.Length != 1)
+                continue;
+
+            string header = decompiledSource.Substring(function.DeclarationOffset,
+                function.BodyOffset - function.DeclarationOffset);
+            Match signature = Regex.Match(header,
+                @"\b(?:function|event)\s+(?<returnType>[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?)\s+" +
+                Regex.Escape(function.Name) + @"\s*\(",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!signature.Success || signature.Groups["returnType"].Value.Equals("void", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string referenceBody = referenceMatches[0].Body.TrimEnd();
+            if (Regex.IsMatch(referenceBody, @"\breturn\s*;\s*$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                continue;
+
+            Match trailingReturn = Regex.Match(function.Body, @"(?<statement>\breturn\s*;)\s*$",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!trailingReturn.Success) continue;
+
+            edits.Add((function.BodyOffset + trailingReturn.Groups["statement"].Index,
+                trailingReturn.Groups["statement"].Length));
+            repaired.Add(function.Name);
+        }
+
+        string result = decompiledSource;
+        foreach (var edit in edits.OrderByDescending(item => item.Start))
+            result = result.Remove(edit.Start, edit.Length);
+        repairedFunctions = repaired;
+        return result;
+    }
+
     private sealed record FunctionBlock(string Name, int Start, int Length, string Text, string Body);
 
     private static Dictionary<string, FunctionBlock> ReadFunctions(string source)
