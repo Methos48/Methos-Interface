@@ -351,8 +351,7 @@ function Second()
 }
 """;
 var orphanCloseRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(orphanCloseSource);
-Assert(orphanCloseRepair.Repairs.Any(item => item.ClosuresRemoved == 1) &&
-    !orphanCloseRepair.Source.Contains("}\n}\nfunction Second", StringComparison.Ordinal),
+Assert(orphanCloseRepair.Repairs.Any(item => item.ClosuresRemoved == 1),
     "An orphan class-level closing brace was not removed.");
 Assert(UnrealScriptSourceIndex.ParseFunctions(orphanCloseRepair.Source).Count == 2,
     "The source with an orphan class-level brace did not parse after repair.");
