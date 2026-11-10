@@ -296,6 +296,39 @@ Assert(repairResult.Repairs.Count == 1 && repairResult.Repairs[0].ClosuresInsert
 Assert(UnrealScriptSourceIndex.ParseFunctions(repairResult.Source).Count == 2,
     "Repaired source did not produce two complete function bodies.");
 
+string stateIdentifierSource = """
+class StateIdentifier extends Object;
+function SetStateAndShow(string State)
+{
+    m_State = State;
+}
+""";
+var stateIdentifierRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(stateIdentifierSource);
+Assert(stateIdentifierRepair.Repairs.Count == 0 &&
+    stateIdentifierRepair.Source.Contains("m_State = State;", StringComparison.Ordinal),
+    "A parameter named State was incorrectly treated as a state declaration boundary.");
+
+string missingCloseBeforeState = """
+class StateBoundary extends Object;
+function First()
+{
+    return;
+state Active
+{
+    event BeginState()
+    {
+        return;
+    }
+}
+""";
+var stateBoundaryRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(missingCloseBeforeState);
+Assert(stateBoundaryRepair.Repairs.Count == 1 &&
+    stateBoundaryRepair.Repairs[0].FunctionName == "First" &&
+    stateBoundaryRepair.Repairs[0].ClosuresInserted == 1,
+    "A missing function closure before a real state declaration was not repaired.");
+Assert(UnrealScriptSourceIndex.ParseFunctions(stateBoundaryRepair.Source).Count == 2,
+    "The source with a state declaration did not parse after closure repair.");
+
 string brokenBeforeDefaults = """
 class BrokenDefaults extends Object;
 function First()
