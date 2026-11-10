@@ -128,30 +128,30 @@ public static class UnrealScriptFunctionDecompiler
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para variables UnrealScript.");
                 return new DecodedExpression(token == EX_DefaultVariable ? "default." + variable : variable, 0);
             }
-            case EX_IntZero: return new DecodedExpression("0", byte.MaxValue);
-            case EX_IntOne: return new DecodedExpression("1", byte.MaxValue);
-            case EX_True: return new DecodedExpression("true", byte.MaxValue);
-            case EX_False: return new DecodedExpression("false", byte.MaxValue);
-            case EX_Self: return new DecodedExpression("self", byte.MaxValue);
-            case EX_NoObject: return new DecodedExpression("none", byte.MaxValue);
+            case EX_IntZero: return new DecodedExpression("0", 0);
+            case EX_IntOne: return new DecodedExpression("1", 0);
+            case EX_True: return new DecodedExpression("true", 0);
+            case EX_False: return new DecodedExpression("false", 0);
+            case EX_Self: return new DecodedExpression("self", 0);
+            case EX_NoObject: return new DecodedExpression("none", 0);
             case EX_IntConst:
-                return new DecodedExpression(ReadInt32(data, ref position).ToString(CultureInfo.InvariantCulture), byte.MaxValue);
+                return new DecodedExpression(ReadInt32(data, ref position).ToString(CultureInfo.InvariantCulture), 0);
             case EX_FloatConst:
             {
                 float value = BitConverter.Int32BitsToSingle(ReadInt32(data, ref position));
-                return new DecodedExpression(value.ToString("R", CultureInfo.InvariantCulture) + "f", byte.MaxValue);
+                return new DecodedExpression(value.ToString("R", CultureInfo.InvariantCulture) + "f", 0);
             }
             case EX_StringConst:
-                return new DecodedExpression(Quote(ReadAnsiString(data, ref position)), byte.MaxValue);
+                return new DecodedExpression(Quote(ReadAnsiString(data, ref position)), 0);
             case EX_UnicodeStringConst:
-                return new DecodedExpression(Quote(ReadUnicodeString(data, ref position)), byte.MaxValue);
+                return new DecodedExpression(Quote(ReadUnicodeString(data, ref position)), 0);
             case EX_NameConst:
             {
                 int index = ReadInt32(data, ref position);
                 string name = nameResolver?.Invoke(index)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para constantes Name.");
                 if (name.Contains("'")) throw new NotSupportedException("Name literal con apóstrofo no admitido en este subconjunto.");
-                return new DecodedExpression("'" + name + "'", byte.MaxValue);
+                return new DecodedExpression("'" + name + "'", 0);
             }
             default:
                 throw new NotSupportedException($"Expresión de bytecode no admitida: 0x{token:X2}.");
