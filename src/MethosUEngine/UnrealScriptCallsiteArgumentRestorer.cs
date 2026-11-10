@@ -99,12 +99,12 @@ public static class UnrealScriptCallsiteArgumentRestorer
     {
         var result = new Dictionary<string, List<CallSite>>(StringComparer.OrdinalIgnoreCase);
         var mask = BuildCodeMask(source);
-        foreach (Match match in Regex.Matches(source, @"\\b(?<name>[A-Za-z_]\\w*)\\s*\\(",
+        foreach (Match match in Regex.Matches(source, @"\b(?<name>[A-Za-z_]\w*)\s*\(",
             RegexOptions.CultureInvariant))
         {
             int nameStart = match.Groups["name"].Index;
             if (!mask[nameStart]) continue;
-            if (Regex.IsMatch(source[..nameStart], @"\\b(function|event)\\s*$",
+            if (Regex.IsMatch(source[..nameStart], @"\b(function|event)\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) continue;
 
             string name = match.Groups["name"].Value;
