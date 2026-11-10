@@ -163,6 +163,13 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
                 normalized, referenceText, out int restoredSymbolicAssignments);
             totalNormalized += restoredSymbolicAssignments;
+            if (Path.GetFileName(sourcePath).Equals("ActionWnd.uc", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"ActionWnd SYMBOLIC ASSIGNMENTS RESTORED: {restoredSymbolicAssignments}.");
+                foreach (string line in normalized.Split('\n')
+                    .Where(line => line.Contains("Type =", StringComparison.OrdinalIgnoreCase)))
+                    Console.WriteLine("ActionWnd TYPE ASSIGNMENT: " + line.Trim());
+            }
             if (Path.GetFileName(sourcePath).Equals("UICommonAPI.uc", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"UICommonAPI RESTORATION COUNTS: enum={restoredEnumArguments}; callsite={restoredCallsiteArguments}; assignments={restoredSymbolicAssignments}; failed-functions={repairedFunctions.Count}.");
@@ -491,6 +498,20 @@ Assert(restoredAssignmentCount == 1 &&
        restoredAssignmentSource.Contains("Info.eType = DIT_TEXT;", StringComparison.Ordinal) &&
        restoredAssignmentSource.Contains("ToolTip.DrawList.Length = 1;", StringComparison.Ordinal),
     "Numeric enum property assignment was not restored from the matching reference function.");
+
+string decompiledCastAssignment = """
+class CastAssignmentTest;
+function Test() { Type = byte(tmp); }
+""";
+string referenceCastAssignment = """
+class CastAssignmentTest;
+function Test() { Type = EActionCategory(tmp); }
+""";
+string restoredCastAssignment = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+    decompiledCastAssignment, referenceCastAssignment, out int restoredCastCount);
+Assert(restoredCastCount == 1 &&
+       restoredCastAssignment.Contains("Type = EActionCategory(tmp);", StringComparison.Ordinal),
+    "Primitive byte cast was not restored to its original enum cast.");
 
 string brokenFunctionSource = """
 class RepairTest;
