@@ -396,6 +396,19 @@ public static class UnrealScriptSourceIndex
                 tokens[previousReturn + 1].Text == ";")
                 continue;
 
+            bool conditionalReturn = false;
+            for (int i = 0; i < previousReturn; i++)
+            {
+                if (depths[i] == depths[previousReturn] &&
+                    tokens[i].Kind == TokenKind.Identifier &&
+                    tokens[i].Text is "if" or "else" or "switch" or "while" or "for" or "foreach" or "do")
+                {
+                    conditionalReturn = true;
+                    break;
+                }
+            }
+            if (conditionalReturn) continue;
+
             int start = function.BodyOffset + tokens[lastReturn].Start;
             int end = function.BodyOffset + tokens[lastReturn + 1].End;
             edits.Add((start, end - start, function.Name, function.Line));
