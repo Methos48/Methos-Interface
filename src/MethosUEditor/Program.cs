@@ -300,6 +300,10 @@ internal sealed class MainForm : Form
                                 source, referenceSource, out int restoredCallsiteArguments);
                             if (restoredCallsiteArguments > 0)
                                 Log($"Argumentos simbólicos recuperados desde llamadas originales: {safeName}.uc; argumentos={restoredCallsiteArguments}.");
+                            source = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
+                                source, referenceSource, out int restoredSymbolicAssignments);
+                            if (restoredSymbolicAssignments > 0)
+                                Log($"Asignaciones simbólicas recuperadas desde la referencia: {safeName}.uc; asignaciones={restoredSymbolicAssignments}.");
                         }
                         catch (Exception referenceError)
                         {
