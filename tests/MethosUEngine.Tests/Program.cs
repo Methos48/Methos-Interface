@@ -389,6 +389,44 @@ if (args.Length > 1)
     var sourceFiles = archive.Entries
         .Where(entry => entry.FullName.EndsWith(".uc", StringComparison.OrdinalIgnoreCase))
         .ToArray();
+    using var sourceMetadata = UnrealLoader.LoadPackage(args[0], FileAccess.Read);
+    sourceMetadata.InitializePackage();
+    var sourceClasses = sourceMetadata.Objects.OfType<UClass>()
+        .Where(item => (int)item > 0)
+        .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
+    var sourcePackageFunctions = sourceMetadata.Objects.OfType<UFunction>().ToArray();
+    int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
+    foreach (var entry in sourceFiles)
+    {
+        string className = Path.GetFileNameWithoutExtension(entry.Name);
+        if (!sourceClasses.TryGetValue(className, out var classObject))
+        {
+            missingClassFiles++;
+            continue;
+        }
+        sourceClassMatches++;
+        using var stream = entry.Open();
+        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
+        var functionsInSource = UnrealScriptSourceIndex.ParseFunctions(
+            UnrealScriptSourceIndex.RepairMissingFunctionClosures(reader.ReadToEnd()).Source);
+        var ownedNames = new List<string>();
+        foreach (var function in sourcePackageFunctions)
+        {
+            for (UELib.Core.UObject? outer = function.Outer; outer != null; outer = outer.Outer)
+            {
+                if (ReferenceEquals(outer, classObject))
+                {
+                    ownedNames.Add(function.Name.ToString());
+                    break;
+                }
+            }
+        }
+        duplicateFunctionTargets += ownedNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Count(group => group.Count() > 1);
+        var targetNames = ownedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        missingFunctionMappings += functionsInSource.Count(function => !targetNames.Contains(function.Name));
+    }
+    Console.WriteLine($"SOURCE MAP: matched classes={sourceClassMatches}/{sourceFiles.Length}; missing class files={missingClassFiles}; source functions without package target={missingFunctionMappings}; duplicate target names={duplicateFunctionTargets}.");
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
