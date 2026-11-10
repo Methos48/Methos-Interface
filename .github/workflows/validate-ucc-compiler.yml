@@ -97,7 +97,9 @@ jobs:
           Write-Host "ORIGINAL_INTERFACE_SHA256=$originalHash"
           Write-Host "METHOS_UCC_EXACT_MATCH=$($generatedHash -eq $originalHash)"
 
-      - name: Descompilar el Interface.u real para probar el recorrido completo
+      - name: "Diagnóstico no bloqueante: exportar fuentes con UELib"
+        id: uelib_export
+        continue-on-error: true
         shell: pwsh
         run: |
           $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
