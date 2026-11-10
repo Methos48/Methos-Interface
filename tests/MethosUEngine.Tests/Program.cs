@@ -356,7 +356,21 @@ if (args.Length > 0)
     Assert(realRoundTrip.Names.SequenceEqual(realPackage.Names), "Real package name table changed during round trip.");
     Assert(realRoundTrip.Imports.SequenceEqual(realPackage.Imports), "Real package import table changed during round trip.");
     Assert(realRoundTrip.Exports.SequenceEqual(realPackage.Exports), "Real package export table changed during round trip.");
-    Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}.");
+
+    byte[] originalPackageBytes = File.ReadAllBytes(packagePath);
+    byte[] nativeBuilderBytes = new UnrealPackageBuilder(realPackage).Build();
+    var nativeBuilderPackage = UnrealPackageIndex.Parse(nativeBuilderBytes);
+    Assert(nativeBuilderPackage.Names.SequenceEqual(realPackage.Names), "Native builder changed the real package name table.");
+    Assert(nativeBuilderPackage.Imports.SequenceEqual(realPackage.Imports), "Native builder changed the real package import table.");
+    Assert(nativeBuilderPackage.Exports.SequenceEqual(realPackage.Exports), "Native builder changed the real package export table.");
+    foreach (var export in realPackage.Exports.Where(item => item.SerialSize > 0))
+    {
+        var rebuiltExport = nativeBuilderPackage.Exports[realPackage.Exports.IndexOf(export)];
+        Assert(originalPackageBytes.AsSpan(export.SerialOffset, export.SerialSize)
+            .SequenceEqual(nativeBuilderBytes.AsSpan(rebuiltExport.SerialOffset, rebuiltExport.SerialSize)),
+            $"Native builder changed serialized payload for export {realPackage.Names[export.ObjectName]}.");
+    }
+    Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}; native no-op serialization preserved all {realPackage.Exports.Count} exports.");
 
     using (var uelibPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read))
     {
