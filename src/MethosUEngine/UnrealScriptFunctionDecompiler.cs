@@ -107,7 +107,8 @@ public static class UnrealScriptFunctionDecompiler
                 int index = ReadInt32(data, ref position);
                 string name = nameResolver?.Invoke(index)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para constantes Name.");
-                return "'" + name.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+                if (name.Contains("'")) throw new NotSupportedException("Name literal con apóstrofo no admitido en este subconjunto.");
+                return "'" + name + "'";
             }
             default:
                 throw new NotSupportedException($"Expresión de bytecode no admitida: 0x{token:X2}.");
@@ -134,9 +135,12 @@ public static class UnrealScriptFunctionDecompiler
         return value;
     }
 
-    private static string Quote(string value) =>
-        "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"")
-            .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t") + "\"";
+    private static string Quote(string value)
+    {
+        if (value.Contains('"') || value.Contains('\r') || value.Contains('\n'))
+            throw new NotSupportedException("Cadena con comillas o saltos de línea no admitida en este subconjunto.");
+        return "\"" + value + "\"";
+    }
 
     private static byte ReadByte(byte[] data, ref int position)
     {
