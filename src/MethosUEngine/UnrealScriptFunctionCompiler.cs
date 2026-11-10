@@ -166,6 +166,7 @@ public static class UnrealScriptFunctionCompiler
         IReadOnlyCollection<UnrealScriptNativeFunction>? nativeFunctions)
     {
         if (nativeFunctions == null || nativeFunctions.Count == 0) return false;
+        expression = TrimOuterParentheses(expression.Trim());
         var candidates = new List<(int Position, UnrealScriptNativeFunction Native)>();
         char quote = '\0';
         int depth = 0;
@@ -174,11 +175,11 @@ public static class UnrealScriptFunctionCompiler
             char c = expression[i];
             if (quote != '\0')
             {
-                if (c == '\\\\' && i + 1 < expression.Length) { i++; continue; }
+                if (c == '\\' && i + 1 < expression.Length) { i++; continue; }
                 if (c == quote) quote = '\0';
                 continue;
             }
-            if (c is '"' or '\'') { quote = c; continue; }
+            if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c == '(') { depth++; continue; }
             if (c == ')') { depth--; continue; }
             if (depth != 0) continue;
@@ -188,7 +189,14 @@ public static class UnrealScriptFunctionCompiler
             {
                 if (native.Name.Length == 0 || i + native.Name.Length > expression.Length) continue;
                 if (!expression.AsSpan(i, native.Name.Length).SequenceEqual(native.Name.AsSpan())) continue;
-                if ((native.Name is "+" or "-") && i == 0) continue;
+                if (native.Name is "+" or "-")
+                {
+                    int previous = i - 1;
+                    while (previous >= 0 && char.IsWhiteSpace(expression[previous])) previous--;
+                    if (previous < 0 || expression[previous] is '(' or '+' or '-' or '*' or '/' or '=' or '!' or '<' or '>' ||
+                        expression[previous] is 'e' or 'E')
+                        continue;
+                }
                 if (native.Name.All(char.IsLetter) &&
                     ((i > 0 && (char.IsLetterOrDigit(expression[i - 1]) || expression[i - 1] == '_')) ||
                      (i + native.Name.Length < expression.Length &&
@@ -202,16 +210,43 @@ public static class UnrealScriptFunctionCompiler
 
         if (candidates.Count == 0) return false;
         var selected = candidates.OrderBy(item => item.Native.Precedence)
-            .ThenByDescending(item => item.Position).First();
+            .ThenBy(item => item.Position).First();
         string left = expression[..selected.Position].Trim();
         string right = expression[(selected.Position + selected.Native.Name.Length)..].Trim();
         if (left.Length == 0 || right.Length == 0) return false;
 
         WriteNativeToken(output, selected.Native.Token);
-        WriteExpression(output, left, nameIndexResolver, variableResolver, nativeFunctions);
-        WriteExpression(output, right, nameIndexResolver, variableResolver, nativeFunctions);
+        WriteExpression(output, TrimOuterParentheses(left), nameIndexResolver, variableResolver, nativeFunctions);
+        WriteExpression(output, TrimOuterParentheses(right), nameIndexResolver, variableResolver, nativeFunctions);
         output.WriteByte(EX_EndFunctionParms);
         return true;
+    }
+
+    private static string TrimOuterParentheses(string expression)
+    {
+        while (expression.Length >= 2 && expression[0] == '(' && expression[^1] == ')')
+        {
+            int depth = 0;
+            bool wrapsAll = true;
+            char quote = '\0';
+            for (int i = 0; i < expression.Length; i++)
+            {
+                char c = expression[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\' && i + 1 < expression.Length) { i++; continue; }
+                    if (c == quote) quote = '\0';
+                    continue;
+                }
+                if (c == '"' || c == (char)39) { quote = c; continue; }
+                if (c == '(') depth++;
+                else if (c == ')' && --depth == 0 && i != expression.Length - 1)
+                { wrapsAll = false; break; }
+            }
+            if (!wrapsAll) break;
+            expression = expression[1..^1].Trim();
+        }
+        return expression;
     }
 
     private static void WriteNativeToken(Stream output, ushort token)
