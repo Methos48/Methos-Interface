@@ -446,11 +446,11 @@ Assert(dialogEnumCount == 1 &&
     "DialogShow's numeric first argument was not restored to DIALOG_Block.");
 string decompiledSoundCall = """
 class UICommonAPI;
-function Test() { local string label; label = "before (not a call, or a comma,)"; PlayConsoleSound(6); PlayConsoleSound(5); }
+function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)\n PlayConsoleSound(6); PlayConsoleSound(5); }
 """;
 string referenceSoundCall = """
 class UICommonAPI;
-function Test() { local string label; label = "before (not a call, or a comma,)"; PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
+function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)\n PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
 """;
 string restoredSoundCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
     decompiledSoundCall, referenceSoundCall, out int restoredSoundCount);
