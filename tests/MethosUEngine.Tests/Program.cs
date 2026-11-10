@@ -115,6 +115,10 @@ if (args.Length >= 3 && args[0] == "--export-sources")
                 for (int line = 215; line < Math.Min(240, stateLines.Length); line++)
                     Console.WriteLine($"DECOMPILED {name}:{line + 1}: {stateLines[line]}");
             }
+            var returnNormalization = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(source);
+            source = returnNormalization.Source;
+            if (returnNormalization.Repairs.Count > 0)
+                Console.WriteLine($"REDUNDANT RETURNS REMOVED: {name}={returnNormalization.Repairs.Count}");
             try
             {
                 source = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source).Source;
@@ -304,6 +308,16 @@ Assert(repairResult.Repairs.Count == 1 && repairResult.Repairs[0].ClosuresInsert
     "Missing function closures were not reconstructed at the next function boundary.");
 Assert(UnrealScriptSourceIndex.ParseFunctions(repairResult.Source).Count == 2,
     "Repaired source did not produce two complete function bodies.");
+
+string redundantReturnSource = "class ReturnTest; function int GetValue() { return 7; return; }";
+var normalizedReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(redundantReturnSource);
+Assert(normalizedReturns.Repairs.Count == 1 &&
+    UnrealScriptSourceIndex.ParseFunctions(normalizedReturns.Source).Single().Body.Trim() == "return 7;",
+    "Redundant trailing bare return was not removed.");
+string conditionalReturnSource = "class ReturnTest; function int GetValue(bool b) { if (b) return 7; return; }";
+var conditionalReturns = UnrealScriptSourceIndex.RemoveRedundantTrailingReturns(conditionalReturnSource);
+Assert(conditionalReturns.Repairs.Count == 0,
+    "A conditional return was incorrectly treated as unreachable.");
 
 string stateIdentifierSource = """
 class StateIdentifier extends Object;
