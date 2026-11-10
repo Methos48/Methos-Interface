@@ -11,5 +11,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Eliot.UELib" Version="1.13.7" />
+    <ProjectReference Include="../MethosUEngine/MethosUEngine.csproj" />
   </ItemGroup>
 </Project>
