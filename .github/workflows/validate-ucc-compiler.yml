@@ -113,6 +113,14 @@ jobs:
           $count = (Get-ChildItem -LiteralPath $sourceDir -File -Filter "*.uc").Count
           if ($count -lt 150) { throw "Se exportaron muy pocas clases ($count)." }
           Write-Host "Fuentes extraídas del Interface.u real: $count clases."
+          $uiCommon = Join-Path $sourceDir "UICommonAPI.uc"
+          if (Test-Path -LiteralPath $uiCommon) {
+            $uiLines = Get-Content -LiteralPath $uiCommon
+            Write-Host "===== UICommonAPI.uc : líneas 15850-15868 ====="
+            for ($n = 15849; $n -lt [Math]::Min(15868, $uiLines.Count); $n++) {
+              Write-Host ("{0}: {1}" -f ($n + 1), $uiLines[$n])
+            }
+          }
           $generated = Join-Path $sourceDir "ClanDrawerWnd.uc"
           $reference = Join-Path $referenceDir "ClanDrawerWnd.uc"
           foreach ($candidate in @($generated, $reference)) {
