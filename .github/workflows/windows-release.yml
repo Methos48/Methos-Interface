@@ -3,8 +3,20 @@ name: Methos U Editor - Windows Release
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "installer/**"
+      - "README-ES.txt"
+      - "THIRD-PARTY-NOTICES.txt"
   pull_request:
     branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "installer/**"
+      - "README-ES.txt"
+      - "THIRD-PARTY-NOTICES.txt"
   workflow_dispatch:
 
 permissions:
