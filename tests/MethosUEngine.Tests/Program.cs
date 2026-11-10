@@ -156,7 +156,7 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             if (Path.GetFileName(sourcePath).Equals("UICommonAPI.uc", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"UICommonAPI RESTORATION COUNTS: enum={restoredEnumArguments}; callsite={restoredCallsiteArguments}; failed-functions={repairedFunctions.Count}.");
-                foreach (string line in normalized.Split(new[] { "\\r\\n", "\\n" }, StringSplitOptions.None)
+                foreach (string line in normalized.Split('\n')
                     .Where(line => line.Contains("PlayConsoleSound", StringComparison.OrdinalIgnoreCase)))
                     Console.WriteLine("UICommonAPI SOUND CALL: " + line.Trim());
             }
