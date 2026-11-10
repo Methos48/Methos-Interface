@@ -191,6 +191,9 @@ public static class UnrealScriptFunctionCompiler
                 if (!expression.AsSpan(i, native.Name.Length).SequenceEqual(native.Name.AsSpan())) continue;
                 if (native.Name is "+" or "-")
                 {
+                    if ((i > 0 && expression[i - 1] == native.Name[0]) ||
+                        (i + 1 < expression.Length && expression[i + 1] == native.Name[0]))
+                        continue;
                     int previous = i - 1;
                     while (previous >= 0 && char.IsWhiteSpace(expression[previous])) previous--;
                     if (previous < 0 || expression[previous] is '(' or '+' or '-' or '*' or '/' or '=' or '!' or '<' or '>' ||
