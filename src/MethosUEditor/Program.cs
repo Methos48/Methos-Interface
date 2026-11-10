@@ -282,14 +282,12 @@ internal sealed class MainForm : Form
             int sizeOffset = checked(export.SerialOffset + relative - 4);
             if (sizeOffset < 0 || sizeOffset > packageBytes.Length - 4) continue;
             int virtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
-            int scriptSize = function.ScriptSize;
-            if (scriptSize < 0 || virtualScriptSize < scriptSize ||
-                relative > export.SerialSize - scriptSize) continue;
+            if (virtualScriptSize < 0) continue;
 
             try
             {
                 string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
-                    packageIndex, exportReference, relative, scriptSize);
+                    packageIndex, exportReference, relative, export.SerialSize - relative, out int scriptSize);
                 byte[] originalBytecode = packageBytes.AsSpan(
                     checked(export.SerialOffset + relative), scriptSize).ToArray();
                 byte[] rebuiltBytecode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(
@@ -387,10 +385,11 @@ internal sealed class MainForm : Form
                 int sizeFieldOffset = checked(exportEntry.SerialOffset + (int)relativeOffset - 4);
                 int originalVirtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
                     packageBytes.AsSpan(sizeFieldOffset, 4));
-                int originalScriptSize = function.ScriptSize;
-                if (originalScriptSize < 0 || originalVirtualScriptSize < originalScriptSize ||
-                    relativeOffset > exportEntry.SerialSize - originalScriptSize)
-                    throw new InvalidDataException($"El tamaño real/virtual del bytecode de '{className}.{function.Name}' excede el export.");
+                if (originalVirtualScriptSize < 0)
+                    throw new InvalidDataException($"El tamaño virtual del bytecode de '{className}.{function.Name}' es negativo.");
+                _ = UnrealScriptFunctionDecompiler.DecompileExport(
+                    nativePackage, exportReference, checked((int)relativeOffset),
+                    checked(exportEntry.SerialSize - (int)relativeOffset), out int originalScriptSize);
                 targets.Add(new UnrealFunctionTarget(function.Name.ToString(), exportReference,
                     checked((int)relativeOffset), originalScriptSize, originalVirtualScriptSize));
             }
