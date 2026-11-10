@@ -201,7 +201,9 @@ Assert(assignmentSource.Replace("\r\n", "\n") == "Health = LocalValue;\nreturn H
 var nativeOperators = new[]
 {
     new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 10),
-    new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 20)
+    new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 20),
+    new UnrealScriptNativeFunction(0x72, "-", UnrealScriptNativeFunctionKind.PreOperator, 30),
+    new UnrealScriptNativeFunction(0x73, "++", UnrealScriptNativeFunctionKind.PostOperator, 30)
 };
 byte[] nativeOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return A + 1;",
     variableResolver: _ => new UnrealScriptVariableReference(0x00, 12),
@@ -221,6 +223,20 @@ Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(precedenceCode,
     objectResolver: reference => reference switch { 12 => "A", 13 => "B", _ => throw new InvalidDataException() },
     nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return A + B * 2;",
     "Native operator precedence was not preserved.");
+byte[] prefixOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return -A;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x00, 12),
+    nativeFunctions: nativeOperators);
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(prefixOperatorCode,
+    objectResolver: reference => reference == 12 ? "A" : throw new InvalidDataException(),
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return -A;",
+    "Native prefix operator source/bytecode round trip failed.");
+byte[] postfixOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return A++;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x00, 12),
+    nativeFunctions: nativeOperators);
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(postfixOperatorCode,
+    objectResolver: reference => reference == 12 ? "A" : throw new InvalidDataException(),
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return A++;",
+    "Native postfix operator source/bytecode round trip failed.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
     "Native compilation modified the original package bytes.");
