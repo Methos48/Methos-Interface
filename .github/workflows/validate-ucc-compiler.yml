@@ -105,7 +105,8 @@ jobs:
           $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
           $referenceDir = Join-Path $env:KIT "ReferenceClasses"
           if (Test-Path -LiteralPath $sourceDir) {
-            Copy-Item -LiteralPath $sourceDir -Destination $referenceDir -Recurse -Force
+            New-Item -ItemType Directory -Path $referenceDir -Force | Out-Null
+            Copy-Item -Path (Join-Path $sourceDir "*") -Destination $referenceDir -Recurse -Force
             Get-ChildItem -LiteralPath $sourceDir -File -Filter "*.uc" | Remove-Item -Force
           }
           dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --export-sources Interface.u $sourceDir
@@ -164,8 +165,7 @@ jobs:
           name: methos-u-decompiled-interface-sources
           path: |
             ucc-validation/Compilador  U/Interlude/Interface/Classes/*.uc
-            ucc-validation/Compilador  U/ReferenceClasses/ClanDrawerWnd.uc
-            ucc-validation/Compilador  U/ReferenceClasses/PartyMatchOutWaitListWnd.uc
+            ucc-validation/Compilador  U/ReferenceClasses/*.uc
           if-no-files-found: warn
 
       - name: "Diagnóstico no bloqueante: recompilar salida del descompilador UELib"
