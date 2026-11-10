@@ -25,8 +25,11 @@ public static class UnrealScriptPatcher
         int storedSize = BinaryPrimitives.ReadInt32LittleEndian(exportPayload.AsSpan(sizeFieldOffset, 4));
         if (originalVirtualScriptSize.HasValue && storedSize != originalVirtualScriptSize.Value)
             throw new InvalidDataException($"El tamaño virtual del bytecode no coincide: el paquete declara {storedSize}, el lector reporta {originalVirtualScriptSize.Value}. Se cancela la modificación.");
-        if (storedSize < 0)
-            throw new InvalidDataException("El tamaño virtual del bytecode es negativo.");
+        if (storedSize < originalScriptSize)
+            throw new InvalidDataException("El tamaño virtual del bytecode es menor que los bytes almacenados.");
+        int outputVirtualSize = newVirtualScriptSize ?? newBytecode.Length;
+        if (outputVirtualSize < newBytecode.Length)
+            throw new InvalidDataException("El tamaño virtual nuevo es menor que el bytecode serializado.");
 
         if (scriptOffsetRelative > exportPayload.Length - originalScriptSize)
             throw new InvalidDataException("El bytecode original excede los límites del objeto.");
@@ -34,7 +37,7 @@ public static class UnrealScriptPatcher
         int suffixOffset = checked(scriptOffsetRelative + originalScriptSize);
         using var output = new MemoryStream(checked(exportPayload.Length - originalScriptSize + newBytecode.Length));
         output.Write(exportPayload, 0, sizeFieldOffset);
-        WriteInt32(output, newVirtualScriptSize ?? newBytecode.Length);
+        WriteInt32(output, outputVirtualSize);
         output.Write(newBytecode);
         output.Write(exportPayload, suffixOffset, exportPayload.Length - suffixOffset);
         return output.ToArray();
