@@ -279,6 +279,26 @@ internal sealed class MainForm : Form
                 }
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+                if (baseName.Equals("Interface", StringComparison.OrdinalIgnoreCase))
+                {
+                    string referenceSourcePath = Path.Combine(
+                        UccRuntimeRoot, "Interlude", "Interface", "Classes", safeName + ".uc");
+                    if (File.Exists(referenceSourcePath))
+                    {
+                        try
+                        {
+                            string referenceSource = File.ReadAllText(referenceSourcePath);
+                            source = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
+                                source, referenceSource, out int restoredEnumArguments);
+                            if (restoredEnumArguments > 0)
+                                Log($"Constantes enum restauradas desde la referencia Interlude: {safeName}.uc; argumentos={restoredEnumArguments}.");
+                        }
+                        catch (Exception referenceError)
+                        {
+                            Log($"Aviso: no se pudieron restaurar constantes enum de {safeName}.uc: {referenceError.Message}");
+                        }
+                    }
+                }
 
                 // UELib can stop formatting nested scopes after a malformed bytecode token.
                 // Repair only missing closing braces at the next function boundary, and report every change.
