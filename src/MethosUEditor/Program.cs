@@ -110,12 +110,15 @@ internal sealed class MainForm : Form
         {
             using var archive = ZipFile.OpenRead(d.FileName);
             int count = 0;
+            var zipBase = Path.GetFileNameWithoutExtension(d.FileName);
+            var targetName = zipBase.Contains("interface", StringComparison.OrdinalIgnoreCase) ? "Interface" : zipBase;
+            var targetDir = Path.Combine(PartsDir, targetName);
+            Directory.CreateDirectory(targetDir);
             foreach (var entry in archive.Entries.Where(e => e.Name.EndsWith(".uc", StringComparison.OrdinalIgnoreCase)))
             {
                 var name = Path.GetFileName(entry.Name);
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                var dst = Path.Combine(PartsDir, name);
-                Directory.CreateDirectory(PartsDir);
+                var dst = Path.Combine(targetDir, name);
                 using var input = entry.Open(); using var output = File.Create(dst);
                 input.CopyTo(output); count++;
             }
@@ -142,7 +145,9 @@ internal sealed class MainForm : Form
         {
             var ucFiles = Directory.GetFiles(d.SelectedPath, "*.uc", SearchOption.AllDirectories);
             if (ucFiles.Length == 0) { MessageBox.Show("No se encontraron archivos .u ni .uc."); return; }
-            var target = Path.Combine(PartsDir, new DirectoryInfo(d.SelectedPath).Name);
+            var folderName = new DirectoryInfo(d.SelectedPath).Name;
+            var targetName = folderName.Contains("interface", StringComparison.OrdinalIgnoreCase) ? "Interface" : folderName;
+            var target = Path.Combine(PartsDir, targetName);
             Directory.CreateDirectory(target);
             foreach (var src in ucFiles) File.Copy(src, Path.Combine(target, Path.GetFileName(src)), true);
             Log($"Importadas {ucFiles.Length} clases .uc.");
@@ -278,23 +283,35 @@ internal sealed class MainForm : Form
     {
         var ini = FindCompilerIni(systemDir);
         if (ini == null) throw new FileNotFoundException("No se encontró el archivo .ini del compilador.");
-        var text = File.ReadAllText(ini, Encoding.Default);
-        var section = "[Editor.EditorEngine]";
-        if (!text.Contains(section, StringComparison.OrdinalIgnoreCase))
-            text += Environment.NewLine + section + Environment.NewLine;
-        var lines = text.Replace("\r\n", "\n").Split('\n').ToList();
-        int start = lines.FindIndex(x => x.Trim().Equals(section, StringComparison.OrdinalIgnoreCase));
-        int end = lines.FindIndex(start + 1, x => x.TrimStart().StartsWith("["));
-        if (end < 0) end = lines.Count;
-        var needed = new[] { "Core", "Engine", "Fire", "Editor", "NWindow", packageName };
-        foreach (var item in needed)
+        var text = File.ReadAllText(ini, Encoding.Default).Replace("\r\n", "\n");
+        var lines = text.Split('\n').ToList();
+
+        const string editorSection = "[Editor.EditorEngine]";
+        int editorStart = lines.FindIndex(x => x.Trim().Equals(editorSection, StringComparison.OrdinalIgnoreCase));
+        if (editorStart < 0)
         {
-            var entry = "EditPackages=" + item;
-            if (!lines.Skip(start + 1).Take(end - start - 1).Any(x => x.Trim().Equals(entry, StringComparison.OrdinalIgnoreCase)))
-            {
-                lines.Insert(end, entry); end++;
-            }
+            lines.Add(editorSection);
+            editorStart = lines.Count - 1;
         }
+        int editorEnd = lines.FindIndex(editorStart + 1, x => x.TrimStart().StartsWith("["));
+        if (editorEnd < 0) editorEnd = lines.Count;
+        lines.RemoveRange(editorStart + 1, editorEnd - editorStart - 1);
+        var packages = new[] { "Core", "Engine", "Fire", "Editor", "NWindow", packageName };
+        lines.InsertRange(editorStart + 1, packages.Select(x => "EditPackages=" + x));
+
+        const string coreSection = "[Core.System]";
+        int coreStart = lines.FindIndex(x => x.Trim().Equals(coreSection, StringComparison.OrdinalIgnoreCase));
+        if (coreStart < 0)
+        {
+            lines.Add(coreSection);
+            coreStart = lines.Count - 1;
+        }
+        int coreEnd = lines.FindIndex(coreStart + 1, x => x.TrimStart().StartsWith("["));
+        if (coreEnd < 0) coreEnd = lines.Count;
+        var sourcePath = "Paths=.." + Path.DirectorySeparatorChar + packageName + Path.DirectorySeparatorChar + "Classes" + Path.DirectorySeparatorChar + "*.uc";
+        if (!lines.Skip(coreStart + 1).Take(coreEnd - coreStart - 1).Any(x => x.Trim().Equals(sourcePath, StringComparison.OrdinalIgnoreCase)))
+            lines.Insert(coreEnd, sourcePath);
+
         File.WriteAllText(ini, string.Join(Environment.NewLine, lines), Encoding.Default);
     }
 
