@@ -10,20 +10,17 @@ DESCOMPILAR
 2. Selecciónalos en la lista.
 3. Pulsa DESCOMPILAR.
 4. Las clases .uc se guardan en "u por partes", dentro de una carpeta con el nombre del paquete.
+5. El programa verifica la estructura de las fuentes y registra las reparaciones de llaves que pueda demostrar con seguridad.
+   La lectura/descompilación general de UnrealScript todavía utiliza UELib como lector de compatibilidad; el descompilador nativo completo sigue en desarrollo.
 
 COMPILAR
-Para compilar se necesita UCC.exe de un entorno de compilación compatible con Lineage II Interlude.
-El compilador UCC y sus bibliotecas de terceros no se redistribuyen con este instalador.
-Coloca el entorno de compilación dentro de:
-  Documentos\Methos U Editor\herramientas\
-o selecciónalo cuando el programa lo solicite.
-
-El compilador debe ser de Interlude y debe incluir UCC.exe, los paquetes Core, Engine, Fire, Editor y NWindow, y un archivo .ini válido.
-No sirve un UCC de otra crónica (C4, Gracia, High Five, etc.).
-El programa trabaja sobre una copia temporal: elimina allí cualquier Interface.u antiguo para obligar a UCC a recompilar, sin tocar tu compilador ni tus archivos originales.
-Antes de reemplazar el resultado, vuelve a abrir el .u generado y comprueba que contenga clases reconocibles.
-El resultado se guarda en "u completo". Si ya existe un archivo con ese nombre, se crea un backup.
-Si UCC falla o el archivo generado no supera la validación, el .u existente se conserva intacto.
+- La acción COMPILAR ya no ejecuta ni solicita UCC.exe.
+- Utiliza el motor nativo Methos para reconstruir el paquete y reemplazar bytecode de funciones existentes.
+- En esta etapa inicial, el compilador solo admite funciones cuyo cuerpo contiene una única instrucción return con un literal compatible (enteros, flotantes, booleanos, cadenas, nombres, self/none o return;).
+- Si una clase, función o expresión queda fuera de ese subconjunto, la compilación se detiene y el .u de destino no se reemplaza.
+- Todavía no se admiten clases nuevas ni el lenguaje UnrealScript completo (variables, llamadas, asignaciones, condiciones, bucles, estados completos y propiedades).
+- El programa verifica el paquete reconstruido con el analizador nativo y vuelve a abrirlo con UELib antes de guardarlo.
+- Si ya existe un archivo de destino, se crea un backup.
 
 IMPORTANTE
-Prueba los paquetes compilados en una copia del cliente. No reemplaces tu Interface.u original sin guardar una copia.
+Este motor está en desarrollo y aún no es un compilador/descompilador completo para Lineage II Interlude. No uses el resultado como reemplazo de tu Interface.u de juego hasta que las pruebas específicas del cliente estén terminadas. Conserva siempre una copia original.
