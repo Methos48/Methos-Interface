@@ -29,8 +29,11 @@ jobs:
       - name: Probar descompilación real de Interface.u
         shell: pwsh
         run: |
-          & "publish\Methos U Editor.exe" --self-test "Interface.u"
-          if ($LASTEXITCODE -ne 0) { throw "La prueba real de descompilación falló." }
+          & "publish\Methos U Editor.exe" --self-test "Interface.u" "selftest-output"
+          if ($LASTEXITCODE -ne 0) {
+            if (Test-Path "selftest-output\selftest.log") { Get-Content "selftest-output\selftest.log" }
+            throw "La prueba real de descompilación falló."
+          }
 
       - name: Instalar Inno Setup
         shell: pwsh
