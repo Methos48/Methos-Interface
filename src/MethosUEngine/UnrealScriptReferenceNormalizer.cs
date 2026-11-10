@@ -131,7 +131,7 @@ public static class UnrealScriptReferenceNormalizer
                 char quote = c;
                 while (++i < end)
                 {
-                    if (source[i] == '\\') { i += Math.Min(1, end - i - 1); continue; }
+                    if (source[i] == '\\' && i + 1 < end) { i++; continue; }
                     if (source[i] == quote) break;
                 }
                 continue;
@@ -189,7 +189,7 @@ public static class UnrealScriptReferenceNormalizer
                 char quote = c;
                 while (++i < source.Length)
                 {
-                    if (source[i] == '\\') { i += Math.Min(1, source.Length - i - 1); continue; }
+                    if (source[i] == '\\' && i + 1 < source.Length) { i++; continue; }
                     if (source[i++] == quote) break;
                 }
                 continue;
