@@ -223,14 +223,6 @@ public static class UnrealScriptSourceIndex
                 while (i < source.Length && source[i] != '\n') i++;
                 continue;
             }
-            if (c == '"' && i + 2 < source.Length &&
-                source[i + 1] == '"' && source[i + 2] == '"')
-            {
-                int start = i;
-                i += 3;
-                tokens.Add(new Token(source[start..i], TokenKind.Literal, start, i, line));
-                continue;
-            }
             if (c is '"' or '\'')
             {
                 char quote = c;
@@ -238,6 +230,7 @@ public static class UnrealScriptSourceIndex
                 while (i < source.Length)
                 {
                     if (source[i] == '\n') line++;
+                    if (source[i] == '\\' && i + 1 < source.Length) { i += 2; continue; }
                     if (source[i++] == quote) break;
                 }
                 tokens.Add(new Token(source[start..i], TokenKind.Literal, start, i, line));
