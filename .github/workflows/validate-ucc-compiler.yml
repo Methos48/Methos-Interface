@@ -113,6 +113,17 @@ jobs:
           $count = (Get-ChildItem -LiteralPath $sourceDir -File -Filter "*.uc").Count
           if ($count -lt 150) { throw "Se exportaron muy pocas clases ($count)." }
           Write-Host "Fuentes extraídas del Interface.u real: $count clases."
+          $referenceFiles = Get-ChildItem -LiteralPath $referenceDir -File -Filter "*.uc"
+          $different = @()
+          foreach ($referenceFile in $referenceFiles) {
+            $generatedFile = Join-Path $sourceDir $referenceFile.Name
+            if (!(Test-Path -LiteralPath $generatedFile)) { $different += "$($referenceFile.Name): MISSING"; continue }
+            $referenceHash = (Get-FileHash -LiteralPath $referenceFile.FullName -Algorithm SHA256).Hash
+            $generatedHash = (Get-FileHash -LiteralPath $generatedFile -Algorithm SHA256).Hash
+            if ($referenceHash -ne $generatedHash) { $different += "$($referenceFile.Name): CHANGED" }
+          }
+          Write-Host "SOURCE_FILES_DIFFERENT_FROM_REFERENCE=$($different.Count)"
+          $different | Select-Object -First 30 | ForEach-Object { Write-Host $_ }
           $uiCommon = Join-Path $sourceDir "UICommonAPI.uc"
           if (Test-Path -LiteralPath $uiCommon) {
             $uiLines = Get-Content -LiteralPath $uiCommon
