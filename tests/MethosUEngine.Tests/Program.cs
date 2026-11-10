@@ -380,7 +380,7 @@ if (args.Length > 0)
     foreach (var function in packageFunctions)
     {
         if (function.ExportTable == null) { invalidFunctionOffsets++; continue; }
-        long relative = function.ScriptOffset - function.ExportTable.SerialOffset;
+        long relative = function.ScriptOffset;
         int exportRef = (int)function;
         if (exportRef < 1 || exportRef > realPackage.Exports.Count ||
             relative < 4 || relative > int.MaxValue)
@@ -463,7 +463,7 @@ if (args.Length > 1)
             int exportReference = (int)function;
             if (exportReference < 1 || exportReference > sourcePackageIndex.Exports.Count) continue;
             var export = sourcePackageIndex.Exports[exportReference - 1];
-            long relativeLong = function.ScriptOffset - function.ExportTable.SerialOffset;
+            long relativeLong = function.ScriptOffset;
             if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
             int relative = (int)relativeLong;
             int sizeOffset = export.SerialOffset + relative - 4;
