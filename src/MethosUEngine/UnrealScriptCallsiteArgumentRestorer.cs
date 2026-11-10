@@ -87,6 +87,87 @@ public static class UnrealScriptCallsiteArgumentRestorer
         return result;
     }
 
+    public static string RestoreSymbolicAssignments(string decompiledSource, string referenceSource, out int restored)
+    {
+        ArgumentNullException.ThrowIfNull(decompiledSource);
+        ArgumentNullException.ThrowIfNull(referenceSource);
+        restored = 0;
+
+        IReadOnlyList<UnrealFunctionSource> currentFunctions;
+        IReadOnlyList<UnrealFunctionSource> referenceFunctions;
+        try
+        {
+            currentFunctions = UnrealScriptSourceIndex.ParseFunctions(decompiledSource);
+            referenceFunctions = UnrealScriptSourceIndex.ParseFunctions(referenceSource);
+        }
+        catch (InvalidDataException)
+        {
+            return decompiledSource;
+        }
+
+        var currentGroups = currentFunctions.GroupBy(function => function.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var referenceGroups = referenceFunctions.GroupBy(function => function.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var edits = new List<(int Start, int Length, string Value)>();
+
+        foreach (var currentFunction in currentFunctions)
+        {
+            if (!currentGroups.TryGetValue(currentFunction.Name, out var currentMatches) || currentMatches.Length != 1 ||
+                !referenceGroups.TryGetValue(currentFunction.Name, out var referenceMatches) || referenceMatches.Length != 1)
+                continue;
+
+            var referenceAssignments = ReadAssignments(referenceMatches[0].Body);
+            var currentAssignments = ReadAssignments(currentFunction.Body);
+            var referenceByLeft = referenceAssignments.GroupBy(item => item.Left, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Select(item => item.Right).ToArray(),
+                    StringComparer.OrdinalIgnoreCase);
+            var occurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var assignment in currentAssignments)
+            {
+                int occurrence = occurrences.TryGetValue(assignment.Left, out int seen) ? seen : 0;
+                occurrences[assignment.Left] = occurrence + 1;
+                if (!int.TryParse(assignment.Right, out _) ||
+                    !referenceByLeft.TryGetValue(assignment.Left, out var referenceValues) ||
+                    occurrence >= referenceValues.Length)
+                    continue;
+
+                string originalValue = referenceValues[occurrence];
+                if (!Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*$",
+                    RegexOptions.CultureInvariant))
+                    continue;
+
+                edits.Add((currentFunction.BodyOffset + assignment.RightStart,
+                    assignment.RightLength, originalValue));
+            }
+        }
+
+        string result = decompiledSource;
+        foreach (var edit in edits.OrderByDescending(item => item.Start))
+            result = result.Remove(edit.Start, edit.Length).Insert(edit.Start, edit.Value);
+        restored = edits.Count;
+        return result;
+    }
+
+    private sealed record Assignment(string Left, string Right, int RightStart, int RightLength);
+
+    private static List<Assignment> ReadAssignments(string body)
+    {
+        const string pattern = @"(?<left>[A-Za-z_]\\w*(?:\\s*\\[[^\\]]+\\])?(?:\\s*\\.\\s*[A-Za-z_]\\w*)*)\\s*=\\s*(?<right>-?\\d+|(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*)\\s*;";
+        var mask = BuildCodeMask(body);
+        var assignments = new List<Assignment>();
+        foreach (Match match in Regex.Matches(body, pattern, RegexOptions.CultureInvariant))
+        {
+            int leftStart = match.Groups["left"].Index;
+            int rightStart = match.Groups["right"].Index;
+            if (!mask[leftStart] || !mask[rightStart]) continue;
+            assignments.Add(new Assignment(match.Groups["left"].Value.Replace(" ", "", StringComparison.Ordinal),
+                match.Groups["right"].Value, rightStart, match.Groups["right"].Length));
+        }
+        return assignments;
+    }
+
     public static string DescribeCallSites(string source, string functionName)
     {
         var calls = ReadCalls(source);
