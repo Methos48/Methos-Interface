@@ -38,10 +38,27 @@ public static class UnrealScriptCallsiteArgumentRestorer
                     var currentArgument = currentArguments[argumentIndex];
                     string currentValue = currentArgument.Text.Trim();
                     string originalValue = referenceArguments[argumentIndex].Text.Trim();
-                    if (!int.TryParse(currentValue, out _) ||
-                        !Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
-                            RegexOptions.CultureInvariant))
-                        continue;
+                    bool restore = false;
+                    if (int.TryParse(currentValue, out _))
+                    {
+                        restore = Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
+                            RegexOptions.CultureInvariant);
+                    }
+                    else
+                    {
+                        Match currentCast = Regex.Match(currentValue,
+                            @"^(?<type>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*\((?<args>[^;{}]*)\)$",
+                            RegexOptions.CultureInvariant);
+                        Match originalCast = Regex.Match(originalValue,
+                            @"^(?<type>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*\((?<args>[^;{}]*)\)$",
+                            RegexOptions.CultureInvariant);
+                        restore = currentCast.Success && originalCast.Success &&
+                            IsPrimitiveCastType(currentCast.Groups["type"].Value) &&
+                            !IsPrimitiveCastType(originalCast.Groups["type"].Value) &&
+                            NormalizeExpression(currentCast.Groups["args"].Value) ==
+                            NormalizeExpression(originalCast.Groups["args"].Value);
+                    }
+                    if (!restore) continue;
 
                     int start = currentArgument.Start;
                     while (start < currentArgument.End && char.IsWhiteSpace(decompiledSource[start])) start++;
