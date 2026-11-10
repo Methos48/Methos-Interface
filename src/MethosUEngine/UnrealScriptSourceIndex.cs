@@ -81,6 +81,106 @@ public static class UnrealScriptSourceIndex
         return functions;
     }
 
+    public sealed record ClosureRepair(string FunctionName, int Line, int ClosuresInserted);
+    public sealed record ClosureRepairResult(string Source, IReadOnlyList<ClosureRepair> Repairs);
+
+    /// <summary>
+    /// Repairs only missing closing braces at the boundary before the next function/event.
+    /// Intended for source emitted by a decompiler that failed while formatting nested scopes.
+    /// The original source is never modified; callers receive a repaired copy and an audit list.
+    /// </summary>
+    public static ClosureRepairResult RepairMissingFunctionClosures(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        List<Token> tokens = Tokenize(source);
+        var headers = FindFunctionHeaders(tokens);
+        var insertions = new List<(int Offset, string Name, int Line, int Count)>();
+
+        for (int h = 0; h < headers.Count; h++)
+        {
+            var header = headers[h];
+            if (header.BodyOpenIndex < 0) continue;
+
+            int boundary = h + 1 < headers.Count
+                ? tokens[headers[h + 1].KeywordIndex].Start
+                : source.Length;
+            int depth = 0;
+            bool closed = false;
+
+            for (int i = header.BodyOpenIndex; i < tokens.Count && tokens[i].Start < boundary; i++)
+            {
+                if (tokens[i].Text == "{") depth++;
+                else if (tokens[i].Text == "}")
+                {
+                    depth--;
+                    if (depth == 0) { closed = true; break; }
+                    if (depth < 0)
+                        throw new InvalidDataException($"La función '{header.Name}' tiene llaves de cierre sobrantes antes de la siguiente declaración.");
+                }
+            }
+
+            if (!closed && depth > 0)
+                insertions.Add((boundary, header.Name, header.Line, depth));
+        }
+
+        string repaired = source;
+        var repairs = new List<ClosureRepair>(insertions.Count);
+        foreach (var item in insertions.OrderByDescending(x => x.Offset))
+        {
+            string closing = Environment.NewLine + new string('}', item.Count) + Environment.NewLine;
+            repaired = repaired.Insert(item.Offset, closing);
+            repairs.Add(new ClosureRepair(item.Name, item.Line, item.Count));
+        }
+
+        // Fail closed if the repaired copy is still structurally incomplete.
+        _ = ParseFunctions(repaired);
+        repairs.Reverse();
+        return new ClosureRepairResult(repaired, repairs);
+    }
+
+    private sealed record FunctionHeader(int KeywordIndex, int BodyOpenIndex, string Name, int Line);
+
+    private static List<FunctionHeader> FindFunctionHeaders(List<Token> tokens)
+    {
+        var headers = new List<FunctionHeader>();
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            Token keyword = tokens[i];
+            if (keyword.Kind != TokenKind.Identifier ||
+                !(keyword.Text.Equals("function", StringComparison.OrdinalIgnoreCase) ||
+                  keyword.Text.Equals("event", StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            int openParen = -1;
+            for (int j = i + 1; j < tokens.Count && j < i + 96; j++)
+            {
+                if (tokens[j].Text == "(") { openParen = j; break; }
+                if (tokens[j].Text is ";" or "{" or "}") break;
+            }
+            if (openParen <= i + 1) continue;
+
+            Token name = tokens[openParen - 1];
+            if (name.Kind == TokenKind.Literal || name.Text.Length == 0) continue;
+
+            int depth = 0, closeParen = -1;
+            for (int j = openParen; j < tokens.Count; j++)
+            {
+                if (tokens[j].Text == "(") depth++;
+                else if (tokens[j].Text == ")" && --depth == 0) { closeParen = j; break; }
+            }
+            if (closeParen < 0) continue;
+
+            int bodyOpen = -1;
+            for (int j = closeParen + 1; j < tokens.Count; j++)
+            {
+                if (tokens[j].Text == "{") { bodyOpen = j; break; }
+                if (tokens[j].Text is ";" or "}") break;
+            }
+            headers.Add(new FunctionHeader(i, bodyOpen, name.Text, keyword.Line));
+        }
+        return headers;
+    }
+
     private static List<Token> Tokenize(string source)
     {
         var tokens = new List<Token>();
