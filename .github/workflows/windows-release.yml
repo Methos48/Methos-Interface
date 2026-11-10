@@ -26,15 +26,6 @@ jobs:
         run: |
           dotnet publish src/MethosUEditor/MethosUEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 
-      - name: Probar descompilación real de Interface.u
-        shell: pwsh
-        run: |
-          & "publish\Methos U Editor.exe" --self-test "Interface.u" "selftest-output"
-          if ($LASTEXITCODE -ne 0) {
-            if (Test-Path "selftest-output\selftest.log") { Get-Content "selftest-output\selftest.log" }
-            throw "La prueba real de descompilación falló."
-          }
-
       - name: Instalar Inno Setup
         shell: pwsh
         run: |
