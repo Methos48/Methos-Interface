@@ -105,7 +105,7 @@ public static class UnrealScriptFunctionCompiler
             char c = source[i];
             if (quote != '\0')
             {
-                if (c == '\\\\' && i + 1 < source.Length) { i++; continue; }
+                if (c == '\\' && i + 1 < source.Length) { i++; continue; }
                 if (c == quote) quote = '\0';
                 continue;
             }
@@ -131,7 +131,7 @@ public static class UnrealScriptFunctionCompiler
             char c = statement[i];
             if (quote != '\0')
             {
-                if (c == '\\\\' && i + 1 < statement.Length) { i++; continue; }
+                if (c == '\\' && i + 1 < statement.Length) { i++; continue; }
                 if (c == quote) quote = '\0';
                 continue;
             }
