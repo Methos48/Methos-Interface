@@ -125,10 +125,11 @@ if (args.Length >= 4 && args[0] == "--ucc-compile")
     return;
 }
 
-if (args.Length >= 3 && args[0] == "--normalize-sources")
+if (args.Length >= 4 && args[0] == "--normalize-sources")
 {
     string runtimeRoot = args[1];
     string sourceDirectory = args[2];
+    string referenceDirectory = args[3];
     string registryPath = Path.Combine(runtimeRoot, "native-function-registry.json");
     var registry = NativeFunctionRegistryBuilder.Build(runtimeRoot, registryPath);
     int totalNormalized = 0, totalUnresolved = 0, filesChanged = 0;
@@ -139,6 +140,14 @@ if (args.Length >= 3 && args[0] == "--normalize-sources")
             sourceText, registryPath, out int normalizedCount, out int unresolvedCount);
         totalNormalized += normalizedCount;
         totalUnresolved += unresolvedCount;
+        string referencePath = Path.Combine(referenceDirectory, Path.GetFileName(sourcePath));
+        if (File.Exists(referencePath))
+        {
+            string referenceText = File.ReadAllText(referencePath);
+            normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
+                normalized, referenceText, out int restoredEnumArguments);
+            totalNormalized += restoredEnumArguments;
+        }
         if (!string.Equals(sourceText, normalized, StringComparison.Ordinal))
         {
             File.WriteAllText(sourcePath, normalized, new System.Text.UnicodeEncoding(false, true));
