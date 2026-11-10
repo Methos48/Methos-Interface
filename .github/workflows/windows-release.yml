@@ -72,6 +72,39 @@ jobs:
           path: compiler-zip-report.json
           if-no-files-found: error
 
+      - name: Extraer paquetes y fuentes Interlude para pruebas (sin ejecutar UCC)
+        shell: pwsh
+        run: |
+          @'
+          import pathlib, zipfile
+          archive = next(p for p in pathlib.Path(".").glob("*.zip")
+                         if "compilador" in p.name.lower() and "u" in p.name.lower())
+          out = pathlib.Path("interlude-fixtures")
+          with zipfile.ZipFile(archive) as z:
+              for info in z.infolist():
+                  name = info.filename.replace("\\\\", "/")
+                  if info.is_dir():
+                      continue
+                  lower = name.lower()
+                  if lower.endswith(".u") and "/system/" in lower:
+                      target = out / pathlib.Path(name).name
+                  elif lower.endswith(".uc") and "/interface/classes/" in lower:
+                      target = out / "Classes" / pathlib.Path(name).name
+                  else:
+                      continue
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(z.read(info))
+          print("Extracted:", *sorted(str(p) for p in out.rglob("*") if p.is_file()), sep="\\n")
+          '@ | Set-Content -Encoding utf8 extract_interlude_fixtures.py
+          python extract_interlude_fixtures.py
+
+      - name: Guardar paquetes y fuentes Interlude de referencia
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-interlude-reference-fixtures
+          path: interlude-fixtures/
+          if-no-files-found: error
+
       - name: Probar motor independiente de paquetes UE2
         shell: pwsh
         run: dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- Interface.u "Carpeta interface.u.zip"
