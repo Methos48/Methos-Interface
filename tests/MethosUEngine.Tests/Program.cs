@@ -105,14 +105,14 @@ if (args.Length >= 4 && args[0] == "--ucc-compile")
         throw new Exception("UCC output table counts differ from the original Interface.u.");
 
     using var originalPackage = UnrealLoader.LoadPackage("Interface.u", FileAccess.Read);
-    using var compiledPackage = UnrealLoader.LoadPackage(outputPath, FileAccess.Read);
+    using var uccBackendPackage = UnrealLoader.LoadPackage(outputPath, FileAccess.Read);
     originalPackage.InitializePackage();
-    compiledPackage.InitializePackage();
+    uccBackendPackage.InitializePackage();
     var originalClasses = originalPackage.Objects.OfType<UClass>()
         .Where(item => (int)item > 0)
         .Select(item => item.Name.ToString())
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    var compiledClasses = compiledPackage.Objects.OfType<UClass>()
+    var compiledClasses = uccBackendPackage.Objects.OfType<UClass>()
         .Where(item => (int)item > 0)
         .Select(item => item.Name.ToString())
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
