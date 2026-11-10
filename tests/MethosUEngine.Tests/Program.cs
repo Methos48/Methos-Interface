@@ -107,6 +107,18 @@ if (args.Length >= 3 && args[0] == "--export-sources")
             string safeName = string.Concat(name.Select(ch =>
                 Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
             string source = item.Decompile();
+            if (name.Equals("PartyMatchOutWaitListWnd", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var state in item.EnumerateFields<UState>())
+                {
+                    state.Load();
+                    var stateFields = state.EnumerateFields().ToList();
+                    Console.WriteLine($"STATE METADATA: class={name}; state={state.Name}; export={(int)state}; scriptOffset={state.ScriptOffset}; scriptSize={state.ScriptSize}; nestedFields={stateFields.Count}");
+                }
+                var stateLines = source.Split(new[] { "\\r\\n", "\\n" }, StringSplitOptions.None);
+                for (int line = 215; line < Math.Min(240, stateLines.Length); line++)
+                    Console.WriteLine($"DECOMPILED {name}:{line + 1}: {stateLines[line]}");
+            }
             try
             {
                 source = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source).Source;
