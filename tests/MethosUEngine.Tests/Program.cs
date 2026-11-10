@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
+using System.Text.Json;
 using MethosUEngine;
 using UELib;
 using UELib.Core;
@@ -687,4 +688,142 @@ if (args.Length > 1)
     Assert(sourceFiles.Length > 0, "No .uc source files were found in the source archive.");
     Assert(sourceErrors.Count == 0, "Source indexing errors: " + string.Join(" | ", sourceErrors.Take(10)));
     Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies; repaired {repairedFunctions} incomplete functions with {insertedClosures} closing braces.");
+}
+
+
+if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Directory.Exists(args[4]))
+{
+    string interludeInterfacePath = args[2];
+    var interludeIndex = UnrealPackageIndex.Open(interludeInterfacePath);
+    using var interludePackage = UnrealLoader.LoadPackage(interludeInterfacePath, FileAccess.Read);
+    interludePackage.InitializePackage();
+    var interludeClasses = interludePackage.Objects.OfType<UClass>()
+        .Where(item => (int)item > 0)
+        .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
+    var interludeFunctions = interludeClasses.Values.SelectMany(EnumerateClassFunctions).ToArray();
+    byte[] interludeBytes = File.ReadAllBytes(interludeInterfacePath);
+    Console.WriteLine($"INTERLUDE UCC PACKAGE: {interludeIndex.Summary.ProfileDescription}; classes={interludeClasses.Count}; functions={interludeFunctions.Length}; exports={interludeIndex.Exports.Count}.");
+
+    int uccRoundTrips = 0, uccUnsupported = 0;
+    bool uccRealPatchPassed = false;
+    foreach (var function in interludeFunctions)
+    {
+        if (function.ExportTable == null) continue;
+        int exportReference = (int)function;
+        if (exportReference < 1 || exportReference > interludeIndex.Exports.Count) continue;
+        var export = interludeIndex.Exports[exportReference - 1];
+        long relativeLong = function.ScriptOffset;
+        if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
+        int relative = (int)relativeLong;
+        int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(
+            interludeBytes.AsSpan(export.SerialOffset + relative - 4, 4));
+        if (virtualSize < 0) continue;
+
+        try
+        {
+            string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
+                interludeIndex, exportReference, relative, export.SerialSize - relative, out int consumedBytes);
+            byte[] originalCode = interludeBytes.AsSpan(export.SerialOffset + relative, consumedBytes).ToArray();
+            int ResolveName(string name)
+            {
+                for (int index = 0; index < interludeIndex.Names.Count; index++)
+                    if (string.Equals(interludeIndex.Names[index], name, StringComparison.OrdinalIgnoreCase))
+                        return index;
+                throw new InvalidDataException($"Name not found: {name}");
+            }
+            byte[] rebuiltCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(nativeSource, ResolveName);
+            if (!rebuiltCode.AsSpan().SequenceEqual(originalCode)) continue;
+            uccRoundTrips++;
+            if (!uccRealPatchPassed)
+            {
+                string probeSource = $"class MethosUCCProbe; function {function.Name}() {{ {nativeSource} }}";
+                var patch = UnrealScriptCompilerPipeline.CompileClassSource(
+                    probeSource, interludeIndex,
+                    new[] { new UnrealFunctionTarget(function.Name.ToString(), exportReference,
+                        relative, consumedBytes, virtualSize) },
+                    repairMissingFunctionClosures: false);
+                var patchedIndex = UnrealPackageIndex.Parse(patch.PackageBytes);
+                Assert(patchedIndex.Exports.Count == interludeIndex.Exports.Count &&
+                    patchedIndex.Imports.Count == interludeIndex.Imports.Count,
+                    "Native compiler failed to patch the UCC-compiled Interlude package.");
+                uccRealPatchPassed = true;
+            }
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
+        {
+            uccUnsupported++;
+        }
+    }
+    Console.WriteLine($"UCC INTERLUDE BYTECODE: exact return-only round trips={uccRoundTrips}; unsupported functions={uccUnsupported}; real package patch={(uccRealPatchPassed ? "PASS" : "not found")}.");
+
+    int sourceMatches = 0, sourceMissing = 0, sourceUnmappedFunctions = 0, sourceDuplicateFunctions = 0;
+    var sourceMissingExamples = new List<string>();
+    var sourceUnmappedExamples = new List<string>();
+    var sourceDuplicateExamples = new List<string>();
+    var interludeSourceFiles = Directory.GetFiles(args[3], "*.uc", SearchOption.AllDirectories);
+    var interludeFunctionMap = interludeClasses.Values.ToDictionary(
+        cls => cls.Name.ToString(),
+        cls => EnumerateClassFunctions(cls).ToArray(),
+        StringComparer.OrdinalIgnoreCase);
+    foreach (string sourcePath in interludeSourceFiles)
+    {
+        string className = Path.GetFileNameWithoutExtension(sourcePath);
+        if (!interludeClasses.TryGetValue(className, out var classObject))
+        {
+            sourceMissing++;
+            sourceMissingExamples.Add(className);
+            continue;
+        }
+        sourceMatches++;
+        string sourceText = File.ReadAllText(sourcePath);
+        var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(
+            UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+        var targets = interludeFunctionMap[className];
+        var targetNames = targets.Select(target => target.Name.ToString()).ToArray();
+        sourceDuplicateFunctions += targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Count(group => group.Count() > 1);
+        var targetNameSet = targetNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingFunctions = sourceFunctions.Where(item => !targetNameSet.Contains(item.Name)).ToArray();
+        sourceUnmappedFunctions += missingFunctions.Length;
+        sourceUnmappedExamples.AddRange(missingFunctions.Take(4).Select(item => className + "." + item.Name));
+        sourceDuplicateExamples.AddRange(targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1).Select(group => className + "." + group.Key));
+    }
+    Console.WriteLine($"UCC SOURCE MAP: classes matched={sourceMatches}/{interludeSourceFiles.Length}; missing classes={sourceMissing}; source functions without target={sourceUnmappedFunctions}; duplicate target names={sourceDuplicateFunctions}.");
+    Console.WriteLine("UCC MISSING CLASSES: " + string.Join(", ", sourceMissingExamples.Take(25)));
+    Console.WriteLine("UCC UNMAPPED FUNCTIONS: " + string.Join(", ", sourceUnmappedExamples.Take(25)));
+    Console.WriteLine("UCC DUPLICATE FUNCTIONS: " + string.Join(", ", sourceDuplicateExamples.Take(25)));
+
+    var nativeRegistry = new List<object>();
+    foreach (string packageName in new[] { "Core", "Engine", "NWindow" })
+    {
+        string dependencyPath = Path.Combine(args[4], packageName + ".u");
+        if (!File.Exists(dependencyPath)) continue;
+        using var dependency = UnrealLoader.LoadPackage(dependencyPath, FileAccess.Read);
+        dependency.InitializePackage();
+        var dependencyClasses = dependency.Objects.OfType<UClass>()
+            .Where(item => (int)item > 0).ToArray();
+        var dependencyFunctions = dependencyClasses.SelectMany(EnumerateClassFunctions).ToArray();
+        var nativeFunctions = dependencyFunctions.Where(item => item.NativeToken != 0).ToArray();
+        var nativeOperators = nativeFunctions.Where(item => item.IsOperator()).ToArray();
+        foreach (var function in nativeFunctions)
+        {
+            nativeRegistry.Add(new
+            {
+                Package = packageName,
+                Owner = function.Outer?.Name.ToString() ?? "",
+                Name = function.Name.ToString(),
+                NativeToken = function.NativeToken,
+                Precedence = function.OperPrecedence,
+                IsOperator = function.IsOperator(),
+                ReturnType = function.ReturnProperty?.Class?.Name.ToString() ?? "",
+                Flags = function.FunctionFlags.ToString()
+            });
+        }
+        Console.WriteLine($"NATIVE TABLE {packageName}: classes={dependencyClasses.Length}; functions={dependencyFunctions.Length}; native={nativeFunctions.Length}; operators={nativeOperators.Length}.");
+        Console.WriteLine($"  OPERATOR SAMPLE: {string.Join(" | ", nativeOperators.Take(35).Select(item => $"{item.Name}={item.NativeToken:X3}/p{item.OperPrecedence}"))}");
+    }
+    File.WriteAllText("native-function-registry.json",
+        JsonSerializer.Serialize(nativeRegistry, new JsonSerializerOptions { WriteIndented = true }));
+    Console.WriteLine($"NATIVE FUNCTION REGISTRY: {nativeRegistry.Count} entries written.");
 }
