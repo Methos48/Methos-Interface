@@ -360,7 +360,7 @@ public static class UnrealScriptSourceIndex
                 int start = i++;
                 while (i < source.Length)
                 {
-                    if (source[i] == '\\\\' && i + 1 < source.Length)
+                    if (source[i] == '\\' && i + 1 < source.Length)
                     {
                         if (source[i + 1] == '\n') line++;
                         i += 2;
