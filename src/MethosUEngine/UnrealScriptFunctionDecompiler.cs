@@ -150,10 +150,9 @@ public static class UnrealScriptFunctionDecompiler
 
     private static string Quote(string value)
     {
-        if (value == "\"") return "\"\"\"";
-        if (value.Contains('"') || value.Contains('\r') || value.Contains('\n'))
-            throw new NotSupportedException("Cadena con comillas múltiples o saltos de línea no admitida en este subconjunto.");
-        return "\"" + value + "\"";
+        if (value.Contains('\r') || value.Contains('\n'))
+            throw new NotSupportedException("Cadena con saltos de línea no admitida en este subconjunto.");
+        return "\"" + value.Replace("\\\\", "\\\\\\\\").Replace("\\\"", "\\\\\"") + "\"";
     }
 
     private static byte ReadByte(byte[] data, ref int position)
