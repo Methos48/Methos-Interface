@@ -110,22 +110,67 @@ internal sealed class MainForm : Form
         try
         {
             using var archive = ZipFile.OpenRead(d.FileName);
-            int count = 0;
-            var zipBase = Path.GetFileNameWithoutExtension(d.FileName);
-            var targetName = zipBase.Contains("interface", StringComparison.OrdinalIgnoreCase) ? "Interface" : zipBase;
-            var targetDir = Path.Combine(PartsDir, targetName);
-            Directory.CreateDirectory(targetDir);
-            foreach (var entry in archive.Entries.Where(e => e.Name.EndsWith(".uc", StringComparison.OrdinalIgnoreCase)))
+            string zipBase = Path.GetFileNameWithoutExtension(d.FileName);
+            var interfaceSources = archive.Entries.Where(entry =>
             {
-                var name = Path.GetFileName(entry.Name);
+                string normalized = entry.FullName.Replace('\\\\', '/');
+                return entry.Name.EndsWith(".uc", StringComparison.OrdinalIgnoreCase) &&
+                    normalized.Contains("/Interface/Classes/", StringComparison.OrdinalIgnoreCase);
+            }).ToArray();
+            bool isInterfaceArchive = zipBase.Contains("interface", StringComparison.OrdinalIgnoreCase) ||
+                interfaceSources.Length > 0;
+            string targetName = isInterfaceArchive ? "Interface" : zipBase;
+            string targetDir = Path.Combine(PartsDir, targetName);
+            Directory.CreateDirectory(targetDir);
+
+            var sourceEntries = interfaceSources.Length > 0
+                ? interfaceSources
+                : archive.Entries.Where(entry => entry.Name.EndsWith(".uc", StringComparison.OrdinalIgnoreCase)).ToArray();
+            int sourceCount = 0;
+            foreach (var entry in sourceEntries)
+            {
+                string name = Path.GetFileName(entry.Name);
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                var dst = Path.Combine(targetDir, name);
-                using var input = entry.Open(); using var output = File.Create(dst);
-                input.CopyTo(output); count++;
+                CopyEntryWithBackup(entry, Path.Combine(targetDir, name));
+                sourceCount++;
             }
-            Log($"ZIP importado: {count} archivos .uc.");
+
+            var packageEntries = archive.Entries
+                .Where(entry => entry.Name.EndsWith(".u", StringComparison.OrdinalIgnoreCase) &&
+                    entry.FullName.Replace('\\\\', '/').Contains("/System/", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(entry => Path.GetFileName(entry.Name), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderByDescending(entry =>
+                    entry.FullName.Contains("/Testar/system/", StringComparison.OrdinalIgnoreCase)).First())
+                .ToArray();
+            int packageCount = 0;
+            foreach (var entry in packageEntries)
+            {
+                string name = Path.GetFileName(entry.Name);
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                CopyEntryWithBackup(entry, Path.Combine(CompleteDir, name));
+                packageCount++;
+            }
+
+            RefreshInputs();
+            Log($"ZIP importado: fuentes .uc={sourceCount} en '{targetName}'; paquetes .u={packageCount}. Ejecutables y DLL ignorados.");
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, "Error al importar ZIP", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    private static void CopyEntryWithBackup(ZipArchiveEntry entry, string destination)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        if (File.Exists(destination))
+        {
+            string backupDir = Path.Combine(Path.GetDirectoryName(destination)!, "backups");
+            Directory.CreateDirectory(backupDir);
+            string backupName = Path.GetFileNameWithoutExtension(destination) + "_" +
+                DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(destination);
+            File.Copy(destination, Path.Combine(backupDir, backupName), true);
+        }
+        using var input = entry.Open();
+        using var output = File.Create(destination);
+        input.CopyTo(output);
     }
 
     private void AddFolder()
