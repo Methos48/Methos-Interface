@@ -99,15 +99,32 @@ public static class UnrealScriptCallsiteArgumentRestorer
             {
                 int occurrence = occurrences.TryGetValue(assignment.Left, out int seen) ? seen : 0;
                 occurrences[assignment.Left] = occurrence + 1;
-                if (!int.TryParse(assignment.Right, out _) ||
-                    !referenceByLeft.TryGetValue(assignment.Left, out var referenceValues) ||
+                if (!referenceByLeft.TryGetValue(assignment.Left, out var referenceValues) ||
                     occurrence >= referenceValues.Length)
                     continue;
 
                 string originalValue = referenceValues[occurrence];
-                if (!Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
-                    RegexOptions.CultureInvariant))
-                    continue;
+                bool restore = false;
+                if (int.TryParse(assignment.Right, out _))
+                {
+                    restore = Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
+                        RegexOptions.CultureInvariant);
+                }
+                else
+                {
+                    Match currentCast = Regex.Match(assignment.Right,
+                        @"^(?<type>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*\((?<args>[^;{}]*)\)$",
+                        RegexOptions.CultureInvariant);
+                    Match originalCast = Regex.Match(originalValue,
+                        @"^(?<type>(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*\((?<args>[^;{}]*)\)$",
+                        RegexOptions.CultureInvariant);
+                    restore = currentCast.Success && originalCast.Success &&
+                        IsPrimitiveCastType(currentCast.Groups["type"].Value) &&
+                        !IsPrimitiveCastType(originalCast.Groups["type"].Value) &&
+                        NormalizeExpression(currentCast.Groups["args"].Value) ==
+                        NormalizeExpression(originalCast.Groups["args"].Value);
+                }
+                if (!restore) continue;
 
                 edits.Add((currentFunction.BodyOffset + assignment.RightStart,
                     assignment.RightLength, originalValue));
@@ -121,11 +138,28 @@ public static class UnrealScriptCallsiteArgumentRestorer
         return result;
     }
 
+    private static bool IsPrimitiveCastType(string typeName)
+    {
+        string simpleName = typeName.Split('.').Last();
+        return simpleName.Equals("byte", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("int", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("float", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("bool", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("string", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("name", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("object", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("vector", StringComparison.OrdinalIgnoreCase) ||
+               simpleName.Equals("rotator", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeExpression(string expression) =>
+        Regex.Replace(expression, @"\s+", "");
+
     private sealed record Assignment(string Left, string Right, int RightStart, int RightLength);
 
     private static List<Assignment> ReadAssignments(string body)
     {
-        const string pattern = @"(?<left>[A-Za-z_]\w*(?:\s*\[[^\]]+\])?(?:\s*\.\s*[A-Za-z_]\w*)*)\s*=\s*(?<right>-?\d+|(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*)\s*;";
+        const string pattern = @"(?<left>[A-Za-z_]\w*(?:\s*\[[^\]]+\])?(?:\s*\.\s*[A-Za-z_]\w*)*)\s*=\s*(?<right>-?\d+|(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*(?:\s*\([^;{}]*\))?)\s*;";
         var mask = BuildCodeMask(body);
         var assignments = new List<Assignment>();
         foreach (Match match in Regex.Matches(body, pattern, RegexOptions.CultureInvariant))
