@@ -23,7 +23,7 @@ jobs:
 
       - name: Probar motor independiente de paquetes UE2
         shell: pwsh
-        run: dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- Interface.u
+        run: dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- Interface.u "Carpeta interface.u.zip"
 
       - name: Publicar ejecutable autónomo x64
         shell: pwsh
