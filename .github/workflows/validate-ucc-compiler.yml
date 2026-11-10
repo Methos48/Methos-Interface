@@ -5,6 +5,7 @@ on:
     paths:
       - "Compilador  U.zip"
       - ".github/workflows/validate-ucc-compiler.yml"
+      - "tests/**"
   workflow_dispatch:
 
 permissions:
