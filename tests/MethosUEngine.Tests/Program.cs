@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 using MethosUEngine;
+using UELib;
+using UELib.Core;
 
 static void Assert(bool condition, string message)
 {
@@ -331,6 +333,34 @@ if (args.Length > 0)
     Assert(realRoundTrip.Imports.SequenceEqual(realPackage.Imports), "Real package import table changed during round trip.");
     Assert(realRoundTrip.Exports.SequenceEqual(realPackage.Exports), "Real package export table changed during round trip.");
     Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}.");
+
+    using (var uelibPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read))
+    {
+        uelibPackage.InitializePackage();
+        var realClasses = uelibPackage.Objects.OfType<UClass>().Where(item => (int)item > 0).ToArray();
+        int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0;
+        var decompileErrors = new List<string>();
+        foreach (var realClass in realClasses)
+        {
+            try
+            {
+                string decompiled = realClass.Decompile();
+                var repaired = UnrealScriptSourceIndex.RepairMissingFunctionClosures(decompiled);
+                realFunctions += UnrealScriptSourceIndex.ParseFunctions(repaired.Source).Count;
+                sourceRepairs += repaired.Repairs.Count;
+                repairedBraces += repaired.Repairs.Sum(item => item.ClosuresInserted);
+                decompiledClasses++;
+            }
+            catch (Exception ex)
+            {
+                decompileErrors.Add($"{realClass.Name}: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        Assert(realClasses.Length > 0, "UELib found no classes in the real package.");
+        Assert(decompileErrors.Count == 0, "Real package decompilation errors: " + string.Join(" | ", decompileErrors.Take(8)));
+        Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}.");
+    }
 }
 
 if (args.Length > 1)
