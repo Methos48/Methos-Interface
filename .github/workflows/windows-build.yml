@@ -31,7 +31,9 @@ jobs:
         if: always()
         with:
           name: methos-u-uelib-probe
-          path: |\n            probe-export/\n            probe-log.txt
+          path: |
+            probe-export/
+            probe-log.txt
           if-no-files-found: ignore
 
       - name: Analizar archivos fuente
