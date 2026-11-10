@@ -691,8 +691,24 @@ if (args.Length > 1)
         using var stream = entry.Open();
         using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
         string sourceText = reader.ReadToEnd();
-        var functionsInSource = UnrealScriptSourceIndex.ParseFunctions(
-            UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+        IReadOnlyList<UnrealScriptFunctionSource> functionsInSource;
+        try
+        {
+            functionsInSource = UnrealScriptSourceIndex.ParseFunctions(sourceText);
+        }
+        catch (InvalidDataException)
+        {
+            try
+            {
+                functionsInSource = UnrealScriptSourceIndex.ParseFunctions(
+                    UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
+            }
+            catch (InvalidDataException sourceError)
+            {
+                sourceErrors.Add($"{entry.Name}: {sourceError.Message}");
+                continue;
+            }
+        }
         var ownedFunctions = new List<UFunction>();
         var ownedNames = new List<string>();
         foreach (var function in sourcePackageFunctions)
