@@ -8,8 +8,8 @@ namespace MethosUEngine;
 public sealed record UnrealScriptVariableReference(byte Token, int ObjectReference);
 
 /// <summary>
-/// First native UnrealScript code generator. This deliberately accepts only a single
-/// return statement with a literal expression; unsupported bodies fail closed.
+/// Initial native UnrealScript code generator. It accepts straight-line assignments
+/// to local/instance variables followed by one explicit return. Unsupported syntax fails closed.
 /// Token IDs are the UE2 bytecode map used by the classic package profile.
 /// </summary>
 public static class UnrealScriptFunctionCompiler
