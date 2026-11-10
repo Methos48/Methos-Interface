@@ -36,9 +36,9 @@ public sealed class UnrealPackageIndex
     public IReadOnlyList<string> Names { get; }
     public IReadOnlyList<ImportEntry> Imports { get; }
     public IReadOnlyList<ExportEntry> Exports { get; }
-    private int NameTableEnd { get; }
-    private int ImportTableEnd { get; }
-    private int ExportTableEnd { get; }
+    internal int NameTableEnd { get; }
+    internal int ImportTableEnd { get; }
+    internal int ExportTableEnd { get; }
     private int GenerationCountOffset { get; }
     private int GenerationRecordsOffset { get; }
 
