@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
@@ -334,6 +335,70 @@ internal sealed class MainForm : Form
             try { if (Directory.Exists(temp)) Directory.Delete(temp, true); } catch { }
         }
     });
+
+    private static IReadOnlyList<UnrealFunctionTarget> BuildFunctionTargets(
+        UClass classObject, UnrealPackageIndex packageIndex, byte[] packageBytes)
+    {
+        var targets = new List<UnrealFunctionTarget>();
+        foreach (var function in classObject.EnumerateFields<UFunction>())
+        {
+            int exportReference = (int)function;
+            if (exportReference < 1 || exportReference > packageIndex.Exports.Count)
+                throw new InvalidDataException($"La función {function.Name} no tiene un export válido.");
+            var export = packageIndex.Exports[exportReference - 1];
+            if (function.ExportTable == null ||
+                function.ExportTable.SerialOffset != export.SerialOffset ||
+                function.ExportTable.SerialSize != export.SerialSize)
+                throw new InvalidDataException($"La tabla export de {function.Name} no coincide con el índice nativo.");
+
+            int scriptOffset = checked((int)function.ScriptOffset);
+            if (scriptOffset < 4 || scriptOffset > export.SerialSize - 4) continue;
+            int sizeOffset = checked(export.SerialOffset + scriptOffset - 4);
+            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
+            if (scriptSize <= 0) continue;
+            if (scriptOffset > export.SerialSize - scriptSize)
+                throw new InvalidDataException($"El bytecode de {function.Name} excede el export original.");
+
+            targets.Add(new UnrealFunctionTarget(function.Name.ToString(), exportReference,
+                scriptOffset, scriptSize));
+        }
+        return targets;
+    }
+
+    private static Func<string, UnrealScriptVariableReference> CreateVariableResolver(
+        UClass classObject, UFunction function)
+    {
+        var localReferences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in function.EnumerateFields<UProperty>())
+        {
+            int reference = (int)property;
+            if (reference > 0) localReferences.TryAdd(property.Name.ToString(), reference);
+        }
+
+        var instanceReferences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in classObject.EnumerateFields<UProperty>())
+        {
+            int reference = (int)property;
+            if (reference > 0) instanceReferences.TryAdd(property.Name.ToString(), reference);
+        }
+
+        return expression =>
+        {
+            bool isDefault = expression.StartsWith("default.", StringComparison.OrdinalIgnoreCase);
+            string name = isDefault ? expression[8..] : expression;
+            if (isDefault)
+            {
+                if (instanceReferences.TryGetValue(name, out int defaultReference))
+                    return new UnrealScriptVariableReference(0x02, defaultReference);
+                throw new NotSupportedException($"No se encontró la propiedad default.{name} en {classObject.Name}.");
+            }
+            if (localReferences.TryGetValue(name, out int localReference))
+                return new UnrealScriptVariableReference(0x00, localReference);
+            if (instanceReferences.TryGetValue(name, out int instanceReference))
+                return new UnrealScriptVariableReference(0x01, instanceReference);
+            throw new NotSupportedException($"No se encontró la variable '{name}' en {function.Name} ni en {classObject.Name}.");
+        };
+    }
 
     private UnrealScriptNativeFunctionCatalog BuildNativeCatalog(string packagePath)
     {
