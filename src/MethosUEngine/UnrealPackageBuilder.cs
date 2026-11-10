@@ -156,8 +156,20 @@ public sealed class UnrealPackageBuilder
             if (verified.Imports[i] != _source.Imports[i])
                 throw new InvalidDataException($"Cambió el import original de índice {i}.");
         for (int i = 0; i < _source.Exports.Count; i++)
-            if (verified.Exports[i] != _source.Exports[i])
+        {
+            ExportEntry original = _source.Exports[i];
+            ExportEntry actual = verified.Exports[i];
+            if (_replacements.ContainsKey(i + 1))
+            {
+                if (actual.ClassRef != original.ClassRef || actual.SuperRef != original.SuperRef ||
+                    actual.Outer != original.Outer || actual.ObjectName != original.ObjectName ||
+                    actual.ObjectFlags != original.ObjectFlags ||
+                    actual.SerialSize != _replacements[i + 1].Length)
+                    throw new InvalidDataException($"El export reemplazado {i} no conserva sus referencias y metadatos.");
+            }
+            else if (actual != original)
                 throw new InvalidDataException($"Cambió el export original de índice {i}.");
+        }
         return result;
     }
 
