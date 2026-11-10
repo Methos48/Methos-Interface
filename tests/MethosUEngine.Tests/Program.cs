@@ -163,6 +163,8 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicAssignments(
                 normalized, referenceText, out int restoredSymbolicAssignments);
             totalNormalized += restoredSymbolicAssignments;
+            if (Path.GetFileName(sourcePath).Equals("AutoBuffWnd.uc", StringComparison.OrdinalIgnoreCase))
+                Console.WriteLine("AutoBuffWnd FAILED FUNCTIONS RESTORED: " + string.Join(",", repairedFunctions));
             if (Path.GetFileName(sourcePath).Equals("ActionWnd.uc", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"ActionWnd SYMBOLIC ASSIGNMENTS RESTORED: {restoredSymbolicAssignments}.");
