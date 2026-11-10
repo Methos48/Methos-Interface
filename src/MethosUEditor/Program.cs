@@ -20,8 +20,14 @@ internal static class Program
                 package.InitializePackage();
                 var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
                 if (classes.Count == 0) throw new InvalidOperationException("No se detectaron clases UnrealScript.");
-                var sample = classes[0].Decompile();
-                if (sample.Length < 100) throw new InvalidOperationException("La descompilación no produjo código fuente suficiente.");
+                long sourceCharacters = 0;
+                foreach (var scriptClass in classes)
+                {
+                    try { sourceCharacters += scriptClass.Decompile().Length; }
+                    catch { }
+                }
+                if (classes.Count < 100 || sourceCharacters < 500_000)
+                    throw new InvalidOperationException("La descompilación no produjo el volumen de código esperado.");
                 Environment.ExitCode = 0;
             }
             catch
