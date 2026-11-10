@@ -388,8 +388,10 @@ if (args.Length > 0)
         var exportEntry = realPackage.Exports[exportRef - 1];
         if (relative > exportEntry.SerialSize - 4) { invalidFunctionOffsets++; continue; }
         int sizeField = checked(exportEntry.SerialOffset + (int)relative - 4);
-        int storedSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeField, 4));
-        if (storedSize < 0 || relative > exportEntry.SerialSize - storedSize)
+        int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeField, 4));
+        int actualSize = function.ScriptSize;
+        if (actualSize <= 0 || virtualSize < actualSize ||
+            relative > exportEntry.SerialSize - actualSize)
         { invalidFunctionOffsets++; continue; }
         checkedFunctionOffsets++;
     }
@@ -413,8 +415,9 @@ if (args.Length > 0)
         if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
         int relative = (int)relativeLong;
         int sizeOffset = export.SerialOffset + relative - 4;
-        int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeOffset, 4));
-        if (scriptSize <= 0 || relative > export.SerialSize - scriptSize) continue;
+        int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(packageFileBytes.AsSpan(sizeOffset, 4));
+        int scriptSize = function.ScriptSize;
+        if (scriptSize <= 0 || virtualSize < scriptSize || relative > export.SerialSize - scriptSize) continue;
         try
         {
             byte[] originalCode = packageFileBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
@@ -435,7 +438,7 @@ if (args.Length > 0)
                 string syntheticClass = $"class MethosNativeProbe; function {function.Name}() {{ {nativeSource} }}";
                 var patched = UnrealScriptCompilerPipeline.CompileClassSource(
                     syntheticClass, realPackage,
-                    new[] { new UnrealFunctionTarget(function.Name.ToString(), exportReference, relative, scriptSize) },
+                    new[] { new UnrealFunctionTarget(function.Name.ToString(), exportReference, relative, scriptSize, virtualSize) },
                     repairMissingFunctionClosures: false);
                 var patchedIndex = UnrealPackageIndex.Parse(patched.PackageBytes);
                 Assert(patchedIndex.Exports.Count == realPackage.Exports.Count &&
@@ -528,8 +531,9 @@ if (args.Length > 1)
             if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
             int relative = (int)relativeLong;
             int sizeOffset = export.SerialOffset + relative - 4;
-            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(sourcePackageBytes.AsSpan(sizeOffset, 4));
-            if (scriptSize < 0 || relative > export.SerialSize - scriptSize) continue;
+            int virtualSize = BinaryPrimitives.ReadInt32LittleEndian(sourcePackageBytes.AsSpan(sizeOffset, 4));
+            int scriptSize = function.ScriptSize;
+            if (scriptSize <= 0 || virtualSize < scriptSize || relative > export.SerialSize - scriptSize) continue;
             try
             {
                 byte[] originalCode = sourcePackageBytes.AsSpan(export.SerialOffset + relative, scriptSize).ToArray();
@@ -553,7 +557,7 @@ if (args.Length > 1)
                         string minimalClassSource = $"class {sourceClassName}; function {sourceFunction.Name}() {{ {sourceFunction.Body} }}";
                         var nativeCompile = UnrealScriptCompilerPipeline.CompileClassSource(
                             minimalClassSource, sourcePackageIndex,
-                            new[] { new UnrealFunctionTarget(sourceFunction.Name, exportReference, relative, scriptSize) },
+                            new[] { new UnrealFunctionTarget(sourceFunction.Name, exportReference, relative, scriptSize, virtualSize) },
                             repairMissingFunctionClosures: false);
                         var rebuiltPackage = UnrealPackageIndex.Parse(nativeCompile.PackageBytes);
                         Assert(rebuiltPackage.Exports.Count == sourcePackageIndex.Exports.Count &&
