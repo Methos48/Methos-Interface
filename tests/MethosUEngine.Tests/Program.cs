@@ -26,6 +26,49 @@ static byte[] Compact(int value)
     return bytes.ToArray();
 }
 
+static byte[] BuildFunctionFixture()
+{
+    using var stream = new MemoryStream();
+    using var writer = new BinaryWriter(stream);
+    writer.Write(0x9E2A83C1u);
+    writer.Write((ushort)126);
+    writer.Write((ushort)0);
+    writer.Write(0u);
+    writer.Write(2); writer.Write(0);
+    writer.Write(1); writer.Write(0);
+    writer.Write(0); writer.Write(0);
+    writer.Write(new byte[16]);
+    writer.Write(1);
+    writer.Write(1); writer.Write(2);
+    writer.Write(new byte[] { 0xAA, 0xBB });
+    writer.Write(2);
+    writer.Write(new byte[] { 0x3A, 0x47, 0xCC });
+    int namesOffset = (int)stream.Position;
+    foreach (string name in new[] { "None", "TestFunc" })
+    {
+        byte[] raw = System.Text.Encoding.Latin1.GetBytes(name + "\0");
+        writer.Write(Compact(raw.Length));
+        writer.Write(raw);
+        writer.Write(0u);
+    }
+    int exportOffset = (int)stream.Position;
+    writer.Write(Compact(0));
+    writer.Write(Compact(0));
+    writer.Write(0);
+    writer.Write(Compact(1));
+    writer.Write(0u);
+    writer.Write(Compact(9));
+    writer.Write(Compact(64));
+    byte[] bytes = stream.ToArray();
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(12, 4), 2);
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(16, 4), namesOffset);
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(20, 4), 1);
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(24, 4), exportOffset);
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(28, 4), 0);
+    BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(32, 4), exportOffset);
+    return bytes;
+}
+
 static byte[] BuildFixture()
 {
     using var stream = new MemoryStream();
@@ -89,6 +132,27 @@ Assert(rejectedMalformed, "Malformed five-byte compact index was accepted.");
 
 byte[] fixture = BuildFixture();
 var parsed = UnrealPackageIndex.Parse(fixture);
+byte[] functionFixture = BuildFunctionFixture();
+var functionPackage = UnrealPackageIndex.Parse(functionFixture);
+var compileResult = UnrealScriptCompilerPipeline.CompileClassSource(
+    "class TestFunc extends Object; function int TestFunc() { return 5; }",
+    functionPackage,
+    new[] { new UnrealFunctionTarget("TestFunc", 1, 6, 2) });
+Assert(compileResult.FunctionsCompiled == 1, "Native compiler did not compile the function.");
+var compiledPackage = UnrealPackageIndex.Parse(compileResult.PackageBytes);
+var compiledExport = compiledPackage.Exports[0];
+byte[] compiledPayload = compileResult.PackageBytes.AsSpan(
+    compiledExport.SerialOffset, compiledExport.SerialSize).ToArray();
+Assert(compiledExport.SerialSize == 14, "Compiled function export size is incorrect.");
+Assert(BinaryPrimitives.ReadInt32LittleEndian(compiledPayload.AsSpan(2, 4)) == 7,
+    "Compiled function bytecode size was not updated.");
+Assert(compiledPayload.AsSpan(6, 7).SequenceEqual(
+    new byte[] { 0x04, 0x1D, 5, 0, 0, 0, 0x47 }),
+    "Native compiler emitted incorrect return bytecode.");
+Assert(compiledPayload[13] == 0xCC, "Compiled function suffix data was not preserved.");
+Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
+    new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
+    "Native compilation modified the original package bytes.");
 foreach (ushort profile in new ushort[] { 111, 121, 123, 126 })
 {
     byte[] profileFixture = fixture.ToArray();
