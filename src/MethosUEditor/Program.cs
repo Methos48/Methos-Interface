@@ -203,7 +203,14 @@ internal sealed class MainForm : Form
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
-        int ok = 0, failed = 0;
+        int ok = 0, failed = 0, repairedClasses = 0, insertedClosures = 0;
+        var repairReport = new List<string>
+        {
+            "INFORME DE RECONSTRUCCIÓN DE CÓDIGO FUENTE",
+            "Las llaves añadidas se insertan únicamente antes de la siguiente declaración function/event o al final del archivo.",
+            "El código original del descompilador se conserva en la subcarpeta originales cuando se realiza una reparación.",
+            ""
+        };
         foreach (var obj in classes)
         {
             try
@@ -211,12 +218,31 @@ internal sealed class MainForm : Form
                 var source = obj.Decompile();
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-                SaveTextWithBackup(Path.Combine(output, safeName + ".uc"), source);
+                var repaired = UnrealScriptSourceIndex.RepairMissingFunctionClosures(source);
+                if (repaired.Repairs.Count > 0)
+                {
+                    var originals = Path.Combine(output, "originales");
+                    Directory.CreateDirectory(originals);
+                    SaveTextWithBackup(Path.Combine(originals, safeName + ".uc"), source);
+                    repairedClasses++;
+                    foreach (var item in repaired.Repairs)
+                    {
+                        insertedClosures += item.ClosuresInserted;
+                        repairReport.Add($"{safeName}.uc | función {item.FunctionName} | línea {item.Line} | llaves añadidas: {item.ClosuresInserted}");
+                        Log($"Reconstrucción de {safeName}.uc: función {item.FunctionName}, línea {item.Line}, llaves añadidas={item.ClosuresInserted}.");
+                    }
+                }
+                SaveTextWithBackup(Path.Combine(output, safeName + ".uc"), repaired.Source);
                 ok++;
             }
             catch (Exception ex) { failed++; Log($"No se pudo exportar una clase: {ex.Message}"); }
         }
-        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}. Carpeta: {output}");
+        if (repairedClasses > 0)
+        {
+            repairReport.Insert(3, $"Clases reparadas: {repairedClasses}; llaves añadidas: {insertedClosures}.");
+            SaveTextWithBackup(Path.Combine(output, "informe_reconstruccion.txt"), string.Join(Environment.NewLine, repairReport));
+        }
+        Log($"Descompilación terminada. Clases exportadas: {ok}; reparadas: {repairedClasses}; llaves añadidas: {insertedClosures}; errores: {failed}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
     });
 
