@@ -14,7 +14,8 @@ public static class UnrealScriptCompilerPipeline
 {
     public static UnrealScriptCompileResult CompileClassSource(string source,
         UnrealPackageIndex package, IReadOnlyCollection<UnrealFunctionTarget> targets,
-        bool repairMissingFunctionClosures = true)
+        bool repairMissingFunctionClosures = true,
+        Func<string, UnrealScriptVariableReference>? variableResolver = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(package);
@@ -47,7 +48,7 @@ public static class UnrealScriptCompilerPipeline
                 throw new InvalidDataException($"El export de '{function.Name}' se intentó compilar más de una vez.");
 
             byte[] bytecode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(
-                function.Body, name => builder.AddName(name));
+                function.Body, name => builder.AddName(name), variableResolver);
             UnrealScriptPatcher.ReplaceExportBytecode(package, builder,
                 target.ExportReference, target.ScriptOffsetRelative,
                 target.OriginalScriptSize, bytecode);
