@@ -1,4 +1,5 @@
 using UELib;
+using UELib.Core;
 using System.Text;
 
 if (args.Length < 1)
@@ -18,7 +19,7 @@ try
     Console.WriteLine($"LicenseeVersion={package.Summary.LicenseeVersion}");
     package.InitializePackage(UnrealPackage.InitFlags.Construct | UnrealPackage.InitFlags.RegisterClasses);
 
-    var classes = package.Objects.Where(o => string.Equals(o.Class?.Name, "Class", StringComparison.OrdinalIgnoreCase)).ToList();
+    var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
     Console.WriteLine($"ObjectCount={package.Objects.Count}");
     Console.WriteLine($"ClassCount={classes.Count}");
 
