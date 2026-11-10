@@ -98,7 +98,29 @@ if (args.Length >= 4 && args[0] == "--ucc-compile")
     UccCompileResult result = UccCompiler.CompileInterface(runtimeRoot, sourceDirectory);
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
     File.WriteAllBytes(outputPath, result.PackageBytes);
-    Console.WriteLine($"UCC C# backend: {result.ProfileDescription}; names={result.NameCount}; imports={result.ImportCount}; exports={result.ExportCount}; bytes={result.PackageBytes.Length}");
+    var originalIndex = UnrealPackageIndex.Open("Interface.u");
+    if (result.NameCount != originalIndex.Names.Count ||
+        result.ImportCount != originalIndex.Imports.Count ||
+        result.ExportCount != originalIndex.Exports.Count)
+        throw new Exception("UCC output table counts differ from the original Interface.u.");
+
+    using var originalPackage = UnrealLoader.LoadPackage("Interface.u", FileAccess.Read);
+    using var compiledPackage = UnrealLoader.LoadPackage(outputPath, FileAccess.Read);
+    originalPackage.InitializePackage();
+    compiledPackage.InitializePackage();
+    var originalClasses = originalPackage.Objects.OfType<UClass>()
+        .Where(item => (int)item > 0)
+        .Select(item => item.Name.ToString())
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var compiledClasses = compiledPackage.Objects.OfType<UClass>()
+        .Where(item => (int)item > 0)
+        .Select(item => item.Name.ToString())
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    if (!originalClasses.SetEquals(compiledClasses))
+        throw new Exception("UCC output class names differ from the original Interface.u.");
+
+    Console.WriteLine($"UCC C# backend: {result.ProfileDescription}; names={result.NameCount}; imports={result.ImportCount}; exports={result.ExportCount}; classes={compiledClasses.Count}; bytes={result.PackageBytes.Length}");
+    Console.WriteLine("UCC output tables and all class names match the original Interface.u.");
     Console.WriteLine(result.CompilerOutput);
     return;
 }
