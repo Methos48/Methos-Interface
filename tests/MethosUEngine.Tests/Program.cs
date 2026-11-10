@@ -169,6 +169,21 @@ Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
 Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
     UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 'Core';", _ => 7), _ => "Core") == "return 'Core';",
     "Name source/bytecode round trip failed.");
+byte[] localVariableCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return LocalValue;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x00, 12));
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(localVariableCode,
+    objectResolver: reference => reference == 12 ? "LocalValue" : throw new InvalidDataException()) == "return LocalValue;",
+    "Local variable source/bytecode round trip failed.");
+byte[] instanceVariableCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return Health;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x01, 27));
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(instanceVariableCode,
+    objectResolver: reference => reference == 27 ? "Health" : throw new InvalidDataException()) == "return Health;",
+    "Instance variable source/bytecode round trip failed.");
+byte[] defaultVariableCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return default.Health;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x02, 27));
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(defaultVariableCode,
+    objectResolver: reference => reference == 27 ? "Health" : throw new InvalidDataException()) == "return default.Health;",
+    "Default variable source/bytecode round trip failed.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
     "Native compilation modified the original package bytes.");
