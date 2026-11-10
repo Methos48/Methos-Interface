@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Analizar archivos fuente
-        shell: pwsh
+        shell: bash
         run: |
           $ErrorActionPreference = "Stop"
           python - <<'PY'
