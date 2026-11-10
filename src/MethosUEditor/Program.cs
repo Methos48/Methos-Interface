@@ -263,6 +263,11 @@ internal sealed class MainForm : Form
                 string nativeRegistryPath = Path.Combine(UccRuntimeRoot, "native-function-registry.json");
                 try
                 {
+                    if (!File.Exists(nativeRegistryPath) && UccCompiler.IsAvailable(UccRuntimeRoot))
+                    {
+                        var nativeEntries = NativeFunctionRegistryBuilder.Build(UccRuntimeRoot, nativeRegistryPath);
+                        Log($"Registro nativo Interlude creado: {nativeEntries.Count} funciones.");
+                    }
                     source = UnrealScriptNativeFunctionNormalizer.Normalize(
                         source, nativeRegistryPath, out int normalizedNativeCalls, out int unresolvedNativeCalls);
                     if (normalizedNativeCalls > 0 || unresolvedNativeCalls > 0)
