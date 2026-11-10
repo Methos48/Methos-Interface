@@ -290,6 +290,10 @@ internal sealed class MainForm : Form
                             string referenceSource = File.ReadAllText(referenceSourcePath);
                             source = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
                                 source, referenceSource, out var restoredFunctions);
+                            source = UnrealScriptFailedFunctionRepair.RestoreInvalidTrailingReturns(
+                                source, referenceSource, out var repairedTrailingReturns);
+                            if (repairedTrailingReturns.Count > 0)
+                                Log($"Retornos vacíos de funciones no-void corregidos: {safeName}.uc; funciones={string.Join(", ", repairedTrailingReturns)}.");
                             if (restoredFunctions.Count > 0)
                                 Log($"Funciones que UELib no pudo descompilar, recuperadas de la referencia: {safeName}.uc; funciones={restoredFunctions.Count}.");
                             source = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
