@@ -158,21 +158,6 @@ jobs:
           if (!(Test-Path -LiteralPath $output)) { throw "No se generó el Interface.u recompilado." }
           & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
 
-      - name: Comparar salida UELib con Interface.u original
-        if: steps.uelib_roundtrip.outcome == 'success'
-        shell: pwsh
-        run: |
-          $compiled = Join-Path $env:KIT "Testar\system\Interface.u"
-          $original = Join-Path $PWD "Interface.u"
-          Get-FileHash -Algorithm SHA256 $compiled | Format-List
-          if (Test-Path -LiteralPath $original) {
-            $a = (Get-FileHash -Algorithm SHA256 $compiled).Hash
-            $b = (Get-FileHash -Algorithm SHA256 $original).Hash
-            Write-Host "UCC_OUTPUT_SHA256=$a"
-            Write-Host "REPO_INTERFACE_SHA256=$b"
-            Write-Host "IDENTICAL=$($a -eq $b)"
-          }
-
       - name: Publicar paquetes y fuentes de referencia (sin ejecutables)
         uses: actions/upload-artifact@v4
         with:
