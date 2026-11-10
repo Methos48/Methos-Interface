@@ -192,7 +192,7 @@ internal sealed class MainForm : Form
         try
         {
             var index = UnrealPackageIndex.Open(path);
-            Log($"Índice independiente UE2: nombres={index.Summary.NameCount}, imports={index.Summary.ImportCount}, exports={index.Summary.ExportCount}, generaciones={index.Summary.GenerationCount}.");
+            Log($"Índice independiente UE2: {index.Summary.ProfileDescription}; nombres={index.Summary.NameCount}, imports={index.Summary.ImportCount}, exports={index.Summary.ExportCount}, generaciones={index.Summary.GenerationCount}.");
         }
         catch (Exception ex)
         {
