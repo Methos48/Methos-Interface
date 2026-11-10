@@ -693,6 +693,7 @@ if (args.Length > 1)
     var duplicateFunctionExamples = new List<string>();
     var nativeUnsupportedExamples = new List<string>();
     var nativeMismatchExamples = new List<string>();
+    var sourceErrors = new List<string>();
     foreach (var entry in sourceFiles)
     {
         string sourceClassName = Path.GetFileNameWithoutExtension(entry.Name);
@@ -816,7 +817,6 @@ if (args.Length > 1)
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
-    var sourceErrors = new List<string>();
     foreach (var entry in sourceFiles)
     {
         try
