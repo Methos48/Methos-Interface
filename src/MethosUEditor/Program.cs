@@ -295,9 +295,11 @@ internal sealed class MainForm : Form
         }
         int editorEnd = lines.FindIndex(editorStart + 1, x => x.TrimStart().StartsWith("["));
         if (editorEnd < 0) editorEnd = lines.Count;
+        var editorSettings = lines.Skip(editorStart + 1).Take(editorEnd - editorStart - 1)
+            .Where(x => !x.TrimStart().StartsWith("EditPackages=", StringComparison.OrdinalIgnoreCase)).ToList();
         lines.RemoveRange(editorStart + 1, editorEnd - editorStart - 1);
         var packages = new[] { "Core", "Engine", "Fire", "Editor", "NWindow", packageName };
-        lines.InsertRange(editorStart + 1, packages.Select(x => "EditPackages=" + x));
+        lines.InsertRange(editorStart + 1, editorSettings.Concat(packages.Select(x => "EditPackages=" + x)));
 
         const string coreSection = "[Core.System]";
         int coreStart = lines.FindIndex(x => x.Trim().Equals(coreSection, StringComparison.OrdinalIgnoreCase));
