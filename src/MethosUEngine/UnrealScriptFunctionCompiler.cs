@@ -113,6 +113,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
+            if (c == '"' && i + 2 < source.Length && source[i + 1] == '"' && source[i + 2] == '"') { i += 2; continue; }
             if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c == ';')
             {
@@ -139,6 +140,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
+            if (c == '"' && i + 2 < statement.Length && statement[i + 1] == '"' && statement[i + 2] == '"') { i += 2; continue; }
             if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c != '=') continue;
             char before = i > 0 ? statement[i - 1] : '\0';
@@ -179,6 +181,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
+            if (c == '"' && i + 2 < expression.Length && expression[i + 1] == '"' && expression[i + 2] == '"') { i += 2; continue; }
             if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c == '(') { depth++; continue; }
             if (c == ')') { depth--; continue; }
@@ -285,6 +288,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
+            if (c == '"' && i + 2 < arguments.Length && arguments[i + 1] == '"' && arguments[i + 2] == '"') { i += 2; continue; }
             if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c == '(') { depth++; continue; }
             if (c == ')') { depth--; continue; }
@@ -320,6 +324,7 @@ public static class UnrealScriptFunctionCompiler
                     if (c == quote) quote = '\0';
                     continue;
                 }
+                if (c == '"' && i + 2 < expression.Length && expression[i + 1] == '"' && expression[i + 2] == '"') { i += 2; continue; }
                 if (c == '"' || c == (char)39) { quote = c; continue; }
                 if (c == '(') depth++;
                 else if (c == ')' && --depth == 0 && i != expression.Length - 1)
@@ -356,21 +361,20 @@ public static class UnrealScriptFunctionCompiler
         if (expression.Equals("self", StringComparison.OrdinalIgnoreCase))
         { output.WriteByte(EX_Self); return; }
 
+        if (expression == "\"\"\"")
+        {
+            WriteStringLiteral(output, "\"");
+            return;
+        }
+
         if (expression.Length >= 2 && expression[0] == '"' && expression[^1] == '"')
         {
             string value = DecodeEscapes(expression[1..^1]);
-            if (value.Any(c => c > 0x7F))
-            {
-                output.WriteByte(EX_UnicodeStringConst);
-                output.Write(Encoding.Unicode.GetBytes(value + "\0"));
-            }
-            else
-            {
-                output.WriteByte(EX_StringConst);
-                output.Write(Encoding.Latin1.GetBytes(value + "\0"));
-            }
+            WriteStringLiteral(output, value);
             return;
         }
+
+
 
         if (expression.Length >= 2 && expression[0] == '\'' && expression[^1] == '\'')
         {
@@ -428,6 +432,20 @@ public static class UnrealScriptFunctionCompiler
         WriteIntLiteral(output, integer);
     }
 
+    private static void WriteStringLiteral(Stream output, string value)
+    {
+        if (value.Any(c => c > 0x7F))
+        {
+            output.WriteByte(EX_UnicodeStringConst);
+            output.Write(Encoding.Unicode.GetBytes(value + "\0"));
+        }
+        else
+        {
+            output.WriteByte(EX_StringConst);
+            output.Write(Encoding.Latin1.GetBytes(value + "\0"));
+        }
+    }
+
     private static void WriteIntLiteral(Stream output, int value)
     {
         if (value == 0) { output.WriteByte(EX_IntZero); return; }
@@ -442,6 +460,13 @@ public static class UnrealScriptFunctionCompiler
         int i = 0;
         while (i < source.Length)
         {
+            if (source[i] == '"' && i + 2 < source.Length &&
+                source[i + 1] == '"' && source[i + 2] == '"')
+            {
+                output.Append("\"\"\"");
+                i += 3;
+                continue;
+            }
             if (source[i] is '"' or '\'')
             {
                 char quote = source[i];
