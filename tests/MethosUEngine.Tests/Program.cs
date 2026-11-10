@@ -497,6 +497,7 @@ if (args.Length > 0)
         int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0, repairedStrings = 0;
         int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
         int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
+        int publicScriptSizesInBounds = 0, publicScriptSizesEndCorrectly = 0, declaredSizesEndCorrectly = 0;
         int exportTableMatches = 0, privateByteSizeMatches = 0, scriptSizeMatches = 0;
         var offsetDiagnostics = new List<string>();
         var nativeDecompileDiagnostics = new List<string>();
@@ -545,10 +546,22 @@ if (args.Length > 0)
                     continue;
                 }
                 validFunctionOffsets++;
+                if (function.ScriptSize > 0 && relativeOffset <= export.SerialSize - function.ScriptSize)
+                {
+                    publicScriptSizesInBounds++;
+                    int publicEnd = checked(export.SerialOffset + (int)relativeOffset + function.ScriptSize - 1);
+                    if (originalPackageBytes[publicEnd] == 0x47) publicScriptSizesEndCorrectly++;
+                }
+                if (originalPackageBytes[checked(export.SerialOffset + (int)relativeOffset + declaredScriptSize - 1)] == 0x47)
+                    declaredSizesEndCorrectly++;
                 try
                 {
-                    _ = UnrealScriptFunctionDecompiler.DecompileExport(realPackage, exportReference,
-                        (int)relativeOffset, declaredScriptSize);
+                    if (function.ScriptSize <= 0 || relativeOffset > export.SerialSize - function.ScriptSize)
+                        throw new InvalidDataException("UELib ScriptSize is outside export bounds.");
+                    int scriptStart = checked(export.SerialOffset + (int)relativeOffset);
+                    byte[] scriptBytes = originalPackageBytes.AsSpan(scriptStart, function.ScriptSize).ToArray();
+                    _ = UnrealScriptFunctionDecompiler.DecompileReturnOnly(scriptBytes,
+                        objectResolver: realPackage.ResolveObjectName);
                     nativeBytecodeDecoded++;
                 }
                 catch (NotSupportedException ex)
@@ -590,7 +603,7 @@ if (args.Length > 0)
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
         Assert(functionsWithBytecode > 0 && validFunctionOffsets > 0,
             $"No function bytecode offsets could be mapped safely: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}. " + string.Join(" | ", offsetDiagnostics));
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, private ByteScriptSize matches={privateByteSizeMatches}, ScriptSize matches={scriptSizeMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}. Offset samples: {string.Join(" | ", offsetDiagnostics)}. Decoder samples: {string.Join(" | ", nativeDecompileDiagnostics)}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, private ByteScriptSize matches={privateByteSizeMatches}, ScriptSize matches={scriptSizeMatches}, public ScriptSize in bounds={publicScriptSizesInBounds}, public ScriptSize ends 0x47={publicScriptSizesEndCorrectly}, declared size ends 0x47={declaredSizesEndCorrectly}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}. Offset samples: {string.Join(" | ", offsetDiagnostics)}. Decoder samples: {string.Join(" | ", nativeDecompileDiagnostics)}.");
     }
 }
 
