@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace MethosUEngine;
 
 public sealed record UnrealFunctionSource(string Name, string Body, int DeclarationOffset,
