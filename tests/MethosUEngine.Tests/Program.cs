@@ -272,3 +272,15 @@ Assert(expanded.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF 
     "Existing object payload moved or changed.");
 
 Console.WriteLine("PASS: UE2 package parsing, lossless round-trip, and append-only builder.");
+
+if (args.Length > 0)
+{
+    string packagePath = args[0];
+    var realPackage = UnrealPackageIndex.Open(packagePath);
+    byte[] realRoundTripBytes = realPackage.CreateLosslessRoundTrip();
+    var realRoundTrip = UnrealPackageIndex.Parse(realRoundTripBytes);
+    Assert(realRoundTrip.Names.SequenceEqual(realPackage.Names), "Real package name table changed during round trip.");
+    Assert(realRoundTrip.Imports.SequenceEqual(realPackage.Imports), "Real package import table changed during round trip.");
+    Assert(realRoundTrip.Exports.SequenceEqual(realPackage.Exports), "Real package export table changed during round trip.");
+    Console.WriteLine($"PASS: real package {packagePath}; {realPackage.Summary.ProfileDescription}; names={realPackage.Summary.NameCount}, imports={realPackage.Summary.ImportCount}, exports={realPackage.Summary.ExportCount}.");
+}
