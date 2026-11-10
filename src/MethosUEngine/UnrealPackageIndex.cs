@@ -272,7 +272,17 @@ public sealed class UnrealPackageIndex
 
 public sealed record PackageSummary(ushort Version, ushort LicenseeVersion, uint Flags,
     int NameCount, int NameOffset, int ExportCount, int ExportOffset, int ImportCount,
-    int ImportOffset, int GenerationCount, int FileLength);
+    int ImportOffset, int GenerationCount, int FileLength)
+{
+    public string ProfileDescription => (Version, LicenseeVersion) switch
+    {
+        (111, _) => "Lineage II: paquete nativo v111",
+        (121, _) => "Lineage II: paquete nativo v121",
+        (123, 0) => "Lineage II: paquete compilado v123/0",
+        (126, 0) => "UE2 v126/0 genérico; no clasificado como perfil L2 estándar",
+        _ => "Paquete Unreal clásico; perfil de juego pendiente de identificar"
+    };
+}
 
 public sealed record ImportEntry(int ClassPackage, int ClassName, int Outer, int ObjectName);
 public sealed record ExportEntry(int ClassRef, int SuperRef, int Outer, int ObjectName,
