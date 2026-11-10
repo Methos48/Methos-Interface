@@ -295,7 +295,7 @@ public sealed record PackageSummary(ushort Version, ushort LicenseeVersion, uint
         (111, _) => "Lineage II: paquete nativo v111",
         (121, _) => "Lineage II: paquete nativo v121",
         (123, 0) => "Lineage II: paquete compilado v123/0",
-        (126, 0) => "UE2 v126/0 genérico; no clasificado como perfil L2 estándar",
+        (126, 0) => "Lineage II Interlude: Unreal2XMP v126/0",
         _ => "Paquete Unreal clásico; perfil de juego pendiente de identificar"
     };
 }
