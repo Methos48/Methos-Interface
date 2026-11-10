@@ -138,6 +138,13 @@ public static class UnrealScriptFunctionCompiler
         int i = 0;
         while (i < source.Length)
         {
+            if (source[i] == '"' && i + 2 < source.Length &&
+                source[i + 1] == '"' && source[i + 2] == '"')
+            {
+                output.Append("\"\"\"");
+                i += 3;
+                continue;
+            }
             if (source[i] is '"' or '\'')
             {
                 char quote = source[i];
