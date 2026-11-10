@@ -100,4 +100,26 @@ Assert(reparsed.Exports.SequenceEqual(parsed.Exports), "Exports changed after ro
 Assert(rebuilt.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }), "Opaque object payload moved or changed.");
 Assert(rebuilt.Length > fixture.Length, "Round-trip tables were not appended.");
 
-Console.WriteLine("PASS: UE2 package index parse and lossless table round-trip.");
+var builder = new UnrealPackageBuilder(parsed);
+int newObjectName = builder.AddName("界面");
+int coreName = builder.AddName("Core");
+int className = builder.AddName("Class");
+int objectName = builder.AddName("Object");
+int importedClass = builder.AddImport(coreName, className, 0, objectName);
+int newExportRef = builder.AddExport(importedClass, 0, 0, newObjectName, 0x00000001,
+    new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55 });
+byte[] expanded = builder.Build();
+var expandedPackage = UnrealPackageIndex.Parse(expanded);
+Assert(newExportRef == 2, "New export reference is incorrect.");
+Assert(expandedPackage.Summary.NameCount == 6, "New names were not appended.");
+Assert(expandedPackage.Summary.ImportCount == 1, "New import was not appended.");
+Assert(expandedPackage.Summary.ExportCount == 2, "New export was not appended.");
+Assert(expandedPackage.Names[2] == "界面", "UTF-16 name was not preserved.");
+var added = expandedPackage.Exports[1];
+Assert(added.ClassRef == -1 && added.SerialSize == 5, "New export metadata is incorrect.");
+Assert(expanded.AsSpan(added.SerialOffset, added.SerialSize).SequenceEqual(
+    new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55 }), "New export payload is incorrect.");
+Assert(expanded.AsSpan(64, 4).SequenceEqual(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }),
+    "Existing object payload moved or changed.");
+
+Console.WriteLine("PASS: UE2 package parsing, lossless round-trip, and append-only builder.");
