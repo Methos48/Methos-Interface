@@ -452,18 +452,19 @@ Assert(dialogEnumCount == 1 &&
 string decompiledSoundCall = """
 class UICommonAPI;
 function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)
- PlayConsoleSound(6); PlayConsoleSound(5); }
+ script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(1); PlayConsoleSound(6); PlayConsoleSound(5); }
 """;
 string referenceSoundCall = """
 class UICommonAPI;
 function Test() { local string label; label = "before (not a call, or a comma,)"; Class'NWindow.UIAPI_WINDOW'.static.SetFocus("param"); // PlayConsoleSound(99)
- PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
+ script = DialogBox(GetScript("DialogBox")); script.SetDefaultAction(EDefaultOK); PlayConsoleSound(IFST_WINDOW_CLOSE); PlayConsoleSound(IFST_WINDOW_OPEN); }
 """;
 string restoredSoundCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
     decompiledSoundCall, referenceSoundCall, out int restoredSoundCount);
-Assert(restoredSoundCount == 2 &&
+Assert(restoredSoundCount == 3 &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_CLOSE)", StringComparison.Ordinal) &&
-       restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal),
+       restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal) &&
+       restoredSoundCall.Contains("script.SetDefaultAction(EDefaultOK)", StringComparison.Ordinal),
     "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
 
 string decompiledAssignmentSource = """
