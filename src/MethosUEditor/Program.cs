@@ -182,14 +182,13 @@ internal sealed class MainForm : Form
         Log($"Descompilando {Path.GetFileName(path)}...");
         using var package = UnrealLoader.LoadPackage(path, FileAccess.Read);
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
-        package.InitializePackage(UnrealPackage.InitFlags.Construct | UnrealPackage.InitFlags.RegisterClasses);
+        package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
         int ok = 0, failed = 0;
         foreach (var obj in classes)
         {
             try
             {
-                obj.BeginDeserializing();
                 var source = obj.Decompile();
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
