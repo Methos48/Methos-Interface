@@ -20,7 +20,7 @@ public static class UnrealScriptFailedFunctionRepair
         ArgumentNullException.ThrowIfNull(referenceSource);
         var restored = new List<string>();
         var referenceFunctions = ReadFunctions(referenceSource);
-        var brokenFunctions = ReadFunctions(decompiledSource)
+        var brokenFunctions = ReadFunctions(decompiledSource).Values
             .Where(function => function.Body.Contains("Failed to format", StringComparison.OrdinalIgnoreCase) ||
                                function.Body.Contains("Failed to decompile", StringComparison.OrdinalIgnoreCase))
             .ToArray();
