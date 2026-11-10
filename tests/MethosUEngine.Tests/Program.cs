@@ -213,6 +213,24 @@ Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"ok // text\"
 Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 'Core';", _ => 7)
     .SequenceEqual(new byte[] { 0x04, 0x21, 7, 0, 0, 0, 0x47 }), "Name return bytecode is incorrect.");
 
+string brokenSource = """
+class Broken extends Object;
+function First()
+{
+    if (true)
+    {
+        return;
+function Second()
+{
+    return;
+}
+""";
+var repairResult = UnrealScriptSourceIndex.RepairMissingFunctionClosures(brokenSource);
+Assert(repairResult.Repairs.Count == 1 && repairResult.Repairs[0].ClosuresInserted == 2,
+    "Missing function closures were not reconstructed at the next function boundary.");
+Assert(UnrealScriptSourceIndex.ParseFunctions(repairResult.Source).Count == 2,
+    "Repaired source did not produce two complete function bodies.");
+
 string sampleSource = """
 class Sample extends Object;
 
@@ -314,6 +332,8 @@ if (args.Length > 1)
         .Where(entry => entry.FullName.EndsWith(".uc", StringComparison.OrdinalIgnoreCase))
         .ToArray();
     int totalIndexedFunctions = 0;
+    int repairedFunctions = 0;
+    int insertedClosures = 0;
     var sourceErrors = new List<string>();
     foreach (var entry in sourceFiles)
     {
@@ -321,7 +341,11 @@ if (args.Length > 1)
         {
             using var stream = entry.Open();
             using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
-            totalIndexedFunctions += UnrealScriptSourceIndex.ParseFunctions(reader.ReadToEnd()).Count;
+            string sourceText = reader.ReadToEnd();
+            var repairedSource = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText);
+            totalIndexedFunctions += UnrealScriptSourceIndex.ParseFunctions(repairedSource.Source).Count;
+            repairedFunctions += repairedSource.Repairs.Count;
+            insertedClosures += repairedSource.Repairs.Sum(repair => repair.ClosuresInserted);
         }
         catch (Exception ex)
         {
@@ -330,5 +354,5 @@ if (args.Length > 1)
     }
     Assert(sourceFiles.Length > 0, "No .uc source files were found in the source archive.");
     Assert(sourceErrors.Count == 0, "Source indexing errors: " + string.Join(" | ", sourceErrors.Take(10)));
-    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies.");
+    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies; repaired {repairedFunctions} incomplete functions with {insertedClosures} closing braces.");
 }
