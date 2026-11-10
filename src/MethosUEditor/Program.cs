@@ -260,6 +260,18 @@ internal sealed class MainForm : Form
             try
             {
                 var source = obj.Decompile();
+                string nativeRegistryPath = Path.Combine(UccRuntimeRoot, "native-function-registry.json");
+                try
+                {
+                    source = UnrealScriptNativeFunctionNormalizer.Normalize(
+                        source, nativeRegistryPath, out int normalizedNativeCalls, out int unresolvedNativeCalls);
+                    if (normalizedNativeCalls > 0 || unresolvedNativeCalls > 0)
+                        Log($"Funciones nativas normalizadas: {normalizedNativeCalls}; sin correspondencia: {unresolvedNativeCalls}.");
+                }
+                catch (Exception normalizeError)
+                {
+                    Log($"Aviso: no se pudieron normalizar las funciones nativas en esta clase: {normalizeError.Message}");
+                }
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
 
