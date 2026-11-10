@@ -323,6 +323,14 @@ Assert(patchedFunctionPayload.AsSpan(6, 2).SequenceEqual(newFunctionCode),
 Assert(patchedFunctionPayload.AsSpan(8).SequenceEqual(new byte[] { 0xCC, 0xDD }),
     "Function suffix changed during bytecode replacement.");
 
+byte[] compactedFunctionPayload = { 0xAA, 0xBB, 6, 0, 0, 0, 0x10, 0x20, 0xCC, 0xDD };
+byte[] compactedPatched = UnrealScriptPatcher.ReplaceBytecode(
+    compactedFunctionPayload, 126, 6, 2, newFunctionCode, originalVirtualScriptSize: 6);
+Assert(BinaryPrimitives.ReadInt32LittleEndian(compactedPatched.AsSpan(2, 4)) == newFunctionCode.Length,
+    "Virtual bytecode size was not updated independently of the original on-disk length.");
+Assert(compactedPatched.AsSpan(8).SequenceEqual(new byte[] { 0xCC, 0xDD }),
+    "Compact-index bytecode suffix was not preserved using the on-disk byte count.");
+
 var replacementBuilder = new UnrealPackageBuilder(parsed);
 byte[] replacementPayload = { 0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x02 };
 replacementBuilder.ReplaceExportPayload(1, replacementPayload);
