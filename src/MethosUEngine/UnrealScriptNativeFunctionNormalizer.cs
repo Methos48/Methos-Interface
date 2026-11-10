@@ -57,9 +57,11 @@ public static class UnrealScriptNativeFunctionNormalizer
             }
 
             string rawArguments = source.Substring(openParen + 1, closeParen - openParen - 1);
-            var arguments = SplitArguments(rawArguments)
-                .Select(argument => NormalizeRange(argument, registry, ref normalized, ref unresolved))
-                .ToArray();
+            string[] rawArgumentParts = SplitArguments(rawArguments);
+            var arguments = new string[rawArgumentParts.Length];
+            for (int argumentIndex = 0; argumentIndex < rawArgumentParts.Length; argumentIndex++)
+                arguments[argumentIndex] = NormalizeRange(
+                    rawArgumentParts[argumentIndex], registry, ref normalized, ref unresolved);
 
             if (!registry.TryGetValue(token, out var entry))
             {
