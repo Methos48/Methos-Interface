@@ -1,0 +1,49 @@
+name: Methos U Editor - Windows Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publicar ejecutable autónomo x64
+        shell: pwsh
+        run: |
+          dotnet publish src/MethosUEditor/MethosUEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          if (!(Test-Path "\${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "No se encontró Inno Setup." }
+
+      - name: Crear instalador
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          & "\${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\Methos-U-Editor.iss
+          if ($LASTEXITCODE -ne 0) { throw "Falló Inno Setup." }
+
+      - name: Publicar ejecutable e instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: Methos-U-Editor-Windows-x64
+          path: |
+            publish/Methos U Editor.exe
+            release/Methos-U-Editor-Setup.exe
+          if-no-files-found: error
