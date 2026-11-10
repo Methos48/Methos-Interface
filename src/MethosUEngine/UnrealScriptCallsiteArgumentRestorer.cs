@@ -87,6 +87,14 @@ public static class UnrealScriptCallsiteArgumentRestorer
         return result;
     }
 
+    public static string DescribeCallSites(string source, string functionName)
+    {
+        var calls = ReadCalls(source);
+        if (!calls.TryGetValue(functionName, out var sites)) return "(none)";
+        return string.Join(" | ", sites.Select(site =>
+            functionName + "(" + string.Join(", ", site.Arguments.Select(argument => argument.Text.Trim())) + ")"));
+    }
+
     private static Dictionary<string, List<CallSite>> ReadCalls(string source)
     {
         var result = new Dictionary<string, List<CallSite>>(StringComparer.OrdinalIgnoreCase);
