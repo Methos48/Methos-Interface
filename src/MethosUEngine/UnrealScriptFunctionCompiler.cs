@@ -93,8 +93,8 @@ public static class UnrealScriptFunctionCompiler
         if (!NumericLiteral.IsMatch(expression))
             throw new NotSupportedException($"Expresión literal todavía no implementada: {expression}");
 
-        string numeric = expression.EndsWith("f", StringComparison.OrdinalIgnoreCase)
-            ? expression[..^1] : expression;
+        bool forceFloat = expression.EndsWith("f", StringComparison.OrdinalIgnoreCase);
+        string numeric = forceFloat ? expression[..^1] : expression;
         if (numeric.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
             numeric.StartsWith("+0x", StringComparison.OrdinalIgnoreCase) ||
             numeric.StartsWith("-0x", StringComparison.OrdinalIgnoreCase))
@@ -110,7 +110,7 @@ public static class UnrealScriptFunctionCompiler
             return;
         }
 
-        if (numeric.Contains('.') || numeric.Contains("e", StringComparison.OrdinalIgnoreCase))
+        if (forceFloat || numeric.Contains('.') || numeric.Contains("e", StringComparison.OrdinalIgnoreCase))
         {
             if (!float.TryParse(numeric, NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
                 throw new InvalidDataException($"Literal float inválido: {expression}");
