@@ -354,13 +354,14 @@ internal sealed class MainForm : Form
             int scriptOffset = checked((int)function.ScriptOffset);
             if (scriptOffset < 4 || scriptOffset > export.SerialSize - 4) continue;
             int sizeOffset = checked(export.SerialOffset + scriptOffset - 4);
-            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
-            if (scriptSize <= 0) continue;
-            if (scriptOffset > export.SerialSize - scriptSize)
-                throw new InvalidDataException($"El bytecode de {function.Name} excede el export original.");
+            int declaredScriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
+            int actualScriptSize = function.ScriptSize;
+            if (declaredScriptSize < 0 || actualScriptSize <= 0 ||
+                scriptOffset > export.SerialSize - actualScriptSize)
+                continue;
 
             targets.Add(new UnrealFunctionTarget(function.Name.ToString(), exportReference,
-                scriptOffset, scriptSize));
+                scriptOffset, declaredScriptSize, actualScriptSize));
         }
         return targets;
     }
