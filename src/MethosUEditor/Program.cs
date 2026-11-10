@@ -14,24 +14,41 @@ internal static class Program
     {
         if (args.Length >= 2 && args[0].Equals("--self-test", StringComparison.OrdinalIgnoreCase))
         {
+            var output = args.Length >= 3 ? Path.GetFullPath(args[2]) : Path.Combine(Path.GetTempPath(), "MethosU_SelfTest");
+            Directory.CreateDirectory(output);
+            var report = new StringBuilder();
             try
             {
                 using var package = UnrealLoader.LoadPackage(args[1], FileAccess.Read);
                 package.InitializePackage();
                 var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
-                if (classes.Count == 0) throw new InvalidOperationException("No se detectaron clases UnrealScript.");
+                int exported = 0, failed = 0;
                 long sourceCharacters = 0;
                 foreach (var scriptClass in classes)
                 {
-                    try { sourceCharacters += scriptClass.Decompile().Length; }
-                    catch { }
+                    try
+                    {
+                        var source = scriptClass.Decompile();
+                        var name = scriptClass.Name?.ToString() ?? $"Class_{exported}";
+                        var safeName = string.Concat(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+                        File.WriteAllText(Path.Combine(output, safeName + ".uc"), source, new UTF8Encoding(false));
+                        sourceCharacters += source.Length;
+                        exported++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        report.AppendLine(ex.ToString());
+                    }
                 }
-                if (classes.Count < 100 || sourceCharacters < 500_000)
-                    throw new InvalidOperationException("La descompilación no produjo el volumen de código esperado.");
-                Environment.ExitCode = 0;
+                report.AppendLine($"Classes={classes.Count}; Exported={exported}; Failed={failed}; Characters={sourceCharacters}");
+                File.WriteAllText(Path.Combine(output, "selftest.log"), report.ToString(), Encoding.UTF8);
+                Environment.ExitCode = exported >= 100 && sourceCharacters >= 500_000 ? 0 : 1;
             }
-            catch
+            catch (Exception ex)
             {
+                report.AppendLine(ex.ToString());
+                File.WriteAllText(Path.Combine(output, "selftest.log"), report.ToString(), Encoding.UTF8);
                 Environment.ExitCode = 1;
             }
             return;
