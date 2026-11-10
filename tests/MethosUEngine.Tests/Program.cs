@@ -144,6 +144,9 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
         if (File.Exists(referencePath))
         {
             string referenceText = File.ReadAllText(referencePath);
+            normalized = UnrealScriptFailedFunctionRepair.RestoreFailedFunctions(
+                normalized, referenceText, out var repairedFunctions);
+            totalNormalized += repairedFunctions.Count;
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                 normalized, referenceText, out int restoredEnumArguments);
             totalNormalized += restoredEnumArguments;
