@@ -236,6 +236,24 @@ Assert(repairResult.Repairs.Count == 1 && repairResult.Repairs[0].ClosuresInsert
 Assert(UnrealScriptSourceIndex.ParseFunctions(repairResult.Source).Count == 2,
     "Repaired source did not produce two complete function bodies.");
 
+string brokenBeforeDefaults = """
+class BrokenDefaults extends Object;
+function First()
+{
+    if (true)
+    {
+        return;
+defaultproperties
+{
+    TestValue=1
+}
+""";
+var defaultsRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(brokenBeforeDefaults);
+Assert(defaultsRepair.Repairs.Count == 1 &&
+    defaultsRepair.Source.IndexOf("defaultproperties", StringComparison.Ordinal) >
+    defaultsRepair.Source.IndexOf("}", defaultsRepair.Source.IndexOf("return;", StringComparison.Ordinal), StringComparison.Ordinal),
+    "Missing function braces were not inserted before the defaultproperties section.");
+
 string sampleSource = """
 class Sample extends Object;
 
