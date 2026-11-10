@@ -66,9 +66,11 @@ public static class UnrealScriptFunctionDecompiler
             throw new InvalidDataException("La posición o tamaño del bytecode no son válidos.");
         byte[] payload = package.CopyOriginalSlice(export.SerialOffset, export.SerialSize);
         int sizeOffset = scriptOffsetRelative - 4;
-        if (sizeOffset > payload.Length - 4 ||
-            BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4)) != scriptSize)
-            throw new InvalidDataException("El tamaño del bytecode no coincide con el campo serializado.");
+        if (sizeOffset > payload.Length - 4)
+            throw new InvalidDataException("El campo de tamaño virtual del bytecode está fuera del export.");
+        int virtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(sizeOffset, 4));
+        if (virtualScriptSize < scriptSize)
+            throw new InvalidDataException("El tamaño virtual del bytecode es menor que los bytes almacenados.");
         if (scriptOffsetRelative > payload.Length - scriptSize)
             throw new InvalidDataException("El bytecode excede el tamaño del export.");
         byte[] bytecode = payload.AsSpan(scriptOffsetRelative, scriptSize).ToArray();
