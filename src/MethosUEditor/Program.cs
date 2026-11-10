@@ -165,14 +165,7 @@ internal sealed class MainForm : Form
     private static void CopyEntryWithBackup(ZipArchiveEntry entry, string destination)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination))
-        {
-            string backupDir = Path.Combine(Path.GetDirectoryName(destination)!, "backups");
-            Directory.CreateDirectory(backupDir);
-            string backupName = Path.GetFileNameWithoutExtension(destination) + "_" +
-                DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(destination);
-            File.Copy(destination, Path.Combine(backupDir, backupName), true);
-        }
+        if (File.Exists(destination)) BackupExistingFile(destination);
         using var input = entry.Open();
         using var output = File.Create(destination);
         input.CopyTo(output);
@@ -467,9 +460,12 @@ internal sealed class MainForm : Form
     private static void BackupExistingFile(string path)
     {
         if (!File.Exists(path)) return;
+        string category = Path.GetExtension(path).Equals(".u", StringComparison.OrdinalIgnoreCase)
+            ? "Packages" : "Sources";
+        string parentName = new DirectoryInfo(Path.GetDirectoryName(path)!).Name;
         string backupRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Methos U Editor", "Backups", "Sources");
+            "Methos U Editor", "Backups", category, parentName);
         Directory.CreateDirectory(backupRoot);
         string backupName = Path.GetFileNameWithoutExtension(path) + "_" +
             DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(path);
@@ -651,25 +647,14 @@ internal sealed class MainForm : Form
     private static void SaveTextWithBackup(string destination, string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination))
-        {
-            var backup = Path.Combine(Path.GetDirectoryName(destination)!, "backups");
-            Directory.CreateDirectory(backup);
-            var backupName = Path.GetFileNameWithoutExtension(destination) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(destination);
-            File.Copy(destination, Path.Combine(backup, backupName), true);
-        }
+        if (File.Exists(destination)) BackupExistingFile(destination);
         File.WriteAllText(destination, content, new UTF8Encoding(false));
     }
 
     private static void CopyWithBackup(string source, string destination)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination))
-        {
-            var backup = Path.Combine(Path.GetDirectoryName(destination)!, "backups");
-            Directory.CreateDirectory(backup);
-            File.Copy(destination, Path.Combine(backup, Path.GetFileNameWithoutExtension(destination) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(destination)), true);
-        }
+        if (File.Exists(destination)) BackupExistingFile(destination);
         File.Copy(source, destination, true);
     }
 
