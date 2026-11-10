@@ -520,8 +520,8 @@ internal sealed class MainForm : Form
                 }
 
                 var destination = Path.Combine(CompleteDir, baseName + ".u");
-                CopyWithBackup(uccTemporaryOutput, destination);
                 SaveSourceSnapshot(baseName, uccResult.PackageBytes, sourceDirectory);
+                CopyWithBackup(uccTemporaryOutput, destination);
                 Log($"Compilación UCC terminada: {ucFiles.Length} fuentes; {uccResult.PackageBytes.Length:N0} bytes; perfil={uccResult.ProfileDescription}; archivo={destination}");
             }
             finally
@@ -623,8 +623,8 @@ internal sealed class MainForm : Form
             }
 
             var destination = Path.Combine(CompleteDir, baseName + ".u");
-            CopyWithBackup(temporaryOutput, destination);
             SaveSourceSnapshot(baseName, packageBytes, sourceDirectory);
+            CopyWithBackup(temporaryOutput, destination);
             Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}. Archivo: {destination}");
         }
         finally
