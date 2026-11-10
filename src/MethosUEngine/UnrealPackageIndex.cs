@@ -5,7 +5,7 @@ namespace MethosUEngine;
 
 /// <summary>
 /// Strict reader and lossless table round-tripper for classic UE1/UE2 packages.
-/// The initial target is Lineage II's classic package layout (format 126/0).
+/// The initial target is the classic UE1/UE2 package layout; Lineage II client profiles are detected by their actual version/licensee pair.
 /// Object payloads are deliberately kept opaque until their class serializer is known.
 /// </summary>
 public sealed class UnrealPackageIndex
