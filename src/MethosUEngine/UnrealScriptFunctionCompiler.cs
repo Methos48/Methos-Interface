@@ -248,7 +248,57 @@ public static class UnrealScriptFunctionCompiler
             output.WriteByte(EX_EndFunctionParms);
             return true;
         }
+
+        foreach (var function in nativeFunctions.Where(item => item.Kind == UnrealScriptNativeFunctionKind.Function)
+                     .OrderByDescending(item => item.Name.Length))
+        {
+            if (function.Name.Length == 0 ||
+                !expression.StartsWith(function.Name, StringComparison.OrdinalIgnoreCase)) continue;
+            int open = function.Name.Length;
+            while (open < expression.Length && char.IsWhiteSpace(expression[open])) open++;
+            if (open >= expression.Length || expression[open] != '(' || expression[^1] != ')') continue;
+            var arguments = SplitArguments(expression[(open + 1)..^1]);
+            WriteNativeToken(output, function.Token);
+            foreach (string argument in arguments)
+                WriteExpression(output, argument, nameIndexResolver, variableResolver, nativeFunctions);
+            output.WriteByte(EX_EndFunctionParms);
+            return true;
+        }
         return false;
+    }
+
+    private static List<string> SplitArguments(string arguments)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(arguments)) return result;
+        int start = 0, depth = 0;
+        char quote = '\0';
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            char c = arguments[i];
+            if (quote != '\0')
+            {
+                if (c == '\\\\' && i + 1 < arguments.Length) { i++; continue; }
+                if (c == quote) quote = '\0';
+                continue;
+            }
+            if (c == '"' || c == (char)39) { quote = c; continue; }
+            if (c == '(') { depth++; continue; }
+            if (c == ')') { depth--; continue; }
+            if (c == ',' && depth == 0)
+            {
+                string argument = arguments[start..i].Trim();
+                if (argument.Length == 0) throw new InvalidDataException("Argumento vacío en llamada nativa.");
+                result.Add(argument);
+                start = i + 1;
+            }
+        }
+        if (quote != '\0' || depth != 0)
+            throw new InvalidDataException("Paréntesis o cadena sin cerrar en llamada nativa.");
+        string last = arguments[start..].Trim();
+        if (last.Length == 0) throw new InvalidDataException("Argumento vacío en llamada nativa.");
+        result.Add(last);
+        return result;
     }
 
     private static string TrimOuterParentheses(string expression)
