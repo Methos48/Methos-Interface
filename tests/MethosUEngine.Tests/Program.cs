@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
+using System.Reflection;
 using MethosUEngine;
 using UELib;
 using UELib.Core;
@@ -496,8 +497,10 @@ if (args.Length > 0)
         int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0, repairedStrings = 0;
         int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
         int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
-        int exportTableMatches = 0;
+        int exportTableMatches = 0, privateByteSizeMatches = 0, scriptSizeMatches = 0;
         var offsetDiagnostics = new List<string>();
+        var byteScriptSizeProperty = typeof(UStruct).GetProperty("ByteScriptSize",
+            BindingFlags.Instance | BindingFlags.NonPublic);
         var decompileErrors = new List<string>();
         foreach (var realClass in realClasses)
         {
@@ -527,6 +530,12 @@ if (args.Length > 0)
                 int sizeFieldOffset = checked(export.SerialOffset + (int)relativeOffset - 4);
                 int declaredScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
                     originalPackageBytes.AsSpan(sizeFieldOffset, 4));
+                int? privateByteScriptSize = byteScriptSizeProperty?.GetValue(function) as int?;
+                if (privateByteScriptSize == declaredScriptSize) privateByteSizeMatches++;
+                if (function.ScriptSize == declaredScriptSize) scriptSizeMatches++;
+                if ((declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize) &&
+                    offsetDiagnostics.Count < 12)
+                    offsetDiagnostics.Add($"{function.Name}: ref={exportReference}, rel={relativeOffset}, stored={declaredScriptSize}, privateByteSize={privateByteScriptSize}, ScriptSize={function.ScriptSize}, export={export.SerialOffset}/{export.SerialSize}, UELib={uelibExportOffset}/{uelibExportSize}");
                 if (declaredScriptSize <= 0 || relativeOffset > export.SerialSize - declaredScriptSize)
                 {
                     invalidFunctionOffsets++;
@@ -564,7 +573,7 @@ if (args.Length > 0)
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
         Assert(functionsWithBytecode > 0 && validFunctionOffsets > 0,
             $"No function bytecode offsets could be mapped safely: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}. " + string.Join(" | ", offsetDiagnostics));
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, private ByteScriptSize matches={privateByteSizeMatches}, ScriptSize matches={scriptSizeMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
     }
 }
 
