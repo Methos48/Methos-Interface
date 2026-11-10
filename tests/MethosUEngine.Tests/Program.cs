@@ -9,6 +9,21 @@ static void Assert(bool condition, string message)
     if (!condition) throw new Exception(message);
 }
 
+static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
+{
+    foreach (var field in owner.EnumerateFields())
+    {
+        if (field is UFunction function)
+        {
+            yield return function;
+            continue;
+        }
+        if (field is UStruct nested)
+            foreach (var function in EnumerateClassFunctions(nested))
+                yield return function;
+    }
+}
+
 static byte[] Compact(int value)
 {
     var bytes = new List<byte>();
@@ -357,7 +372,7 @@ if (args.Length > 0)
     var packageClasses = metadataPackage.Objects.OfType<UClass>()
         .Where(item => (int)item > 0)
         .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
-    var packageFunctions = metadataPackage.Objects.OfType<UFunction>().ToArray();
+    var packageFunctions = packageClasses.Values.SelectMany(EnumerateClassFunctions).ToArray();
     byte[] packageFileBytes = File.ReadAllBytes(packagePath);
     int checkedFunctionOffsets = 0, invalidFunctionOffsets = 0;
     foreach (var function in packageFunctions)
@@ -394,7 +409,7 @@ if (args.Length > 1)
     var sourceClasses = sourceMetadata.Objects.OfType<UClass>()
         .Where(item => (int)item > 0)
         .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
-    var sourcePackageFunctions = sourceMetadata.Objects.OfType<UFunction>().ToArray();
+    var sourcePackageFunctions = sourceClasses.Values.SelectMany(EnumerateClassFunctions).ToArray();
     int sourceClassMatches = 0, missingClassFiles = 0, missingFunctionMappings = 0, duplicateFunctionTargets = 0;
     foreach (var entry in sourceFiles)
     {
