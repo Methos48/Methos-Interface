@@ -29,7 +29,8 @@ try
         {
             obj.BeginDeserializing();
             var source = obj.Decompile();
-            var safeName = string.Concat(obj.Name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+            var objectName = obj.Name?.ToString() ?? $"Object_{exported}";
+            var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
             File.WriteAllText(Path.Combine(output, safeName + ".uc"), source, new UTF8Encoding(false));
             exported++;
         }
