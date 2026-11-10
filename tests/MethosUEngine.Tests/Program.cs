@@ -198,6 +198,39 @@ Assert(assignmentCode.SequenceEqual(new byte[]
 }), "Assignment bytecode token order or object references are incorrect.");
 Assert(assignmentSource.Replace("\r\n", "\n") == "Health = LocalValue;\nreturn Health;",
     "Variable assignment and return source/bytecode round trip failed.");
+using var ntlStream = new MemoryStream();
+using (var ntlWriter = new BinaryWriter(ntlStream, Encoding.UTF8, leaveOpen: true))
+{
+    ntlWriter.Write(0x2C8D14F1u);
+    ntlWriter.Write(3);
+    ntlWriter.Write("+"); ntlWriter.Write((byte)20); ntlWriter.Write((byte)2); ntlWriter.Write(0x70);
+    ntlWriter.Write("++"); ntlWriter.Write((byte)0); ntlWriter.Write((byte)4); ntlWriter.Write(0x73);
+    ntlWriter.Write("Max"); ntlWriter.Write((byte)0); ntlWriter.Write((byte)1); ntlWriter.Write(0x180);
+}
+ntlStream.Position = 0;
+var nativeCatalog = UnrealScriptNativeFunctionCatalog.Load(ntlStream);
+Assert(nativeCatalog.Resolve(0x70)?.Name == "+" &&
+    nativeCatalog.Resolve(0x180)?.Name == "Max" &&
+    nativeCatalog.FindByName("++")?.Kind == UnrealScriptNativeFunctionKind.PostOperator,
+    "Native NTL catalog parsing failed.");
+using var ntlRoundTrip = new MemoryStream();
+nativeCatalog.Save(ntlRoundTrip);
+ntlRoundTrip.Position = 0;
+var nativeCatalogRoundTrip = UnrealScriptNativeFunctionCatalog.Load(ntlRoundTrip);
+Assert(nativeCatalogRoundTrip.Items.Count == 3 && nativeCatalogRoundTrip.Resolve(0x180)?.Name == "Max",
+    "Native NTL catalog round trip failed.");
+byte[] extendedNativeCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return Max(A, B);",
+    variableResolver: name => new UnrealScriptVariableReference(0x00, name == "A" ? 12 : 13),
+    nativeFunctions: nativeCatalog.Items);
+Assert(extendedNativeCode.SequenceEqual(new byte[]
+{
+    0x04, 0x61, 0x80, 0x00, 12, 0, 0, 0, 0x00, 13, 0, 0, 0, 0x16, 0x47
+}), "Extended native function token encoding is incorrect.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(extendedNativeCode,
+    objectResolver: reference => reference switch { 12 => "A", 13 => "B", _ => throw new InvalidDataException() },
+    nativeResolver: nativeCatalogRoundTrip.Resolve) == "return Max(A, B);",
+    "Extended native function source/bytecode round trip failed.");
+
 var nativeOperators = new[]
 {
     new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 20),
