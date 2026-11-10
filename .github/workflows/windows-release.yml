@@ -134,6 +134,42 @@ jobs:
         run: |
           dotnet publish src/MethosUEditor/MethosUEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 
+      - name: Incluir runtime UCC y fuentes originales verificadas de Interface
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = Get-ChildItem -LiteralPath $PWD -File -Filter "*.zip" |
+            Where-Object { $_.Name -match "compilador.*u" } |
+            Select-Object -First 1
+          if (!$archive) { throw "No se encontró Compilador U.zip para empaquetar el runtime." }
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive.FullName)
+          try {
+            $prefix = "Compilador  U/"
+            $runtimeRoot = Join-Path $PWD "publish\UccRuntime"
+            foreach ($entry in $zip.Entries) {
+              $relative = $null
+              if ($entry.FullName.StartsWith($prefix + "Interlude/System/", [StringComparison]::OrdinalIgnoreCase)) {
+                $relative = $entry.FullName.Substring($prefix.Length)
+              }
+              elseif ($entry.FullName.StartsWith($prefix + "Interlude/Interface/Classes/", [StringComparison]::OrdinalIgnoreCase) -and
+                      $entry.FullName.EndsWith(".uc", [StringComparison]::OrdinalIgnoreCase)) {
+                $relative = $entry.FullName.Substring($prefix.Length)
+              }
+              if ($null -ne $relative) {
+                $destination = Join-Path $runtimeRoot $relative
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination, $true)
+              }
+            }
+          }
+          finally { $zip.Dispose() }
+          $runtimeSystem = Join-Path $PWD "publish\UccRuntime\Interlude\System"
+          $referenceClasses = Join-Path $PWD "publish\UccRuntime\Interlude\Interface\Classes"
+          if (!(Test-Path (Join-Path $runtimeSystem "ucc.exe"))) { throw "No se incluyó ucc.exe." }
+          $classCount = (Get-ChildItem -LiteralPath $referenceClasses -File -Filter "*.uc").Count
+          if ($classCount -lt 150) { throw "Solo se incluyeron $classCount fuentes .uc de referencia." }
+          Write-Host "Runtime UCC incluido; fuentes originales de Interface: $classCount clases."
+
       - name: Instalar Inno Setup
         shell: pwsh
         run: |
