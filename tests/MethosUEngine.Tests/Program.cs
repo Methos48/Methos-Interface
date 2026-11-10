@@ -490,7 +490,7 @@ if (args.Length > 0)
     {
         uelibPackage.InitializePackage();
         var realClasses = uelibPackage.Objects.OfType<UClass>().Where(item => (int)item > 0).ToArray();
-        int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0;
+        int decompiledClasses = 0, realFunctions = 0, sourceRepairs = 0, repairedBraces = 0, repairedStrings = 0;
         int functionsWithBytecode = 0, validFunctionOffsets = 0, invalidFunctionOffsets = 0;
         int nativeBytecodeDecoded = 0, nativeBytecodeUnsupported = 0, nativeBytecodeMalformed = 0;
         int exportTableMatches = 0;
@@ -548,6 +548,7 @@ if (args.Length > 0)
                 realFunctions += UnrealScriptSourceIndex.ParseFunctions(repaired.Source).Count;
                 sourceRepairs += repaired.Repairs.Count;
                 repairedBraces += repaired.Repairs.Sum(item => item.ClosuresInserted);
+                repairedStrings += repaired.StringEscapesRepaired;
                 decompiledClasses++;
             }
             catch (Exception ex)
@@ -560,7 +561,7 @@ if (args.Length > 0)
         Assert(decompiledClasses == realClasses.Length, "Not all real package classes were decompiled.");
         Assert(functionsWithBytecode > 0 && validFunctionOffsets > 0,
             $"No function bytecode offsets could be mapped safely: total={functionsWithBytecode}, valid={validFunctionOffsets}, invalid={invalidFunctionOffsets}. " + string.Join(" | ", offsetDiagnostics));
-        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
+        Console.WriteLine($"PASS: real UELib differential decompilation; classes={decompiledClasses}, source functions={realFunctions}, repaired functions={sourceRepairs}, inserted braces={repairedBraces}, normalized strings={repairedStrings}, bytecode functions={functionsWithBytecode}, verified offsets/sizes={validFunctionOffsets}, invalid offsets={invalidFunctionOffsets}, export-table matches={exportTableMatches}, native bytecode decoded={nativeBytecodeDecoded}, unsupported tokens={nativeBytecodeUnsupported}, malformed={nativeBytecodeMalformed}.");
     }
 }
 
@@ -574,6 +575,7 @@ if (args.Length > 1)
     int totalIndexedFunctions = 0;
     int repairedFunctions = 0;
     int insertedClosures = 0;
+    int repairedStringEscapes = 0;
     var sourceErrors = new List<string>();
     foreach (var entry in sourceFiles)
     {
@@ -586,6 +588,7 @@ if (args.Length > 1)
             totalIndexedFunctions += UnrealScriptSourceIndex.ParseFunctions(repairedSource.Source).Count;
             repairedFunctions += repairedSource.Repairs.Count;
             insertedClosures += repairedSource.Repairs.Sum(repair => repair.ClosuresInserted);
+            repairedStringEscapes += repairedSource.StringEscapesRepaired;
         }
         catch (Exception ex)
         {
@@ -594,5 +597,5 @@ if (args.Length > 1)
     }
     Assert(sourceFiles.Length > 0, "No .uc source files were found in the source archive.");
     Assert(sourceErrors.Count == 0, "Source indexing errors: " + string.Join(" | ", sourceErrors.Take(10)));
-    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies; repaired {repairedFunctions} incomplete functions with {insertedClosures} closing braces.");
+    Console.WriteLine($"PASS: scanned {sourceFiles.Length} .uc files; located {totalIndexedFunctions} function bodies; repaired {repairedFunctions} incomplete functions with {insertedClosures} closing braces; normalized {repairedStringEscapes} malformed string escapes.");
 }
