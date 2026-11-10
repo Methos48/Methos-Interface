@@ -210,7 +210,7 @@ public static class UnrealScriptFunctionCompiler
 
         if (candidates.Count > 0)
         {
-            var selected = candidates.OrderBy(item => item.Native.Precedence)
+            var selected = candidates.OrderByDescending(item => item.Native.Precedence)
                 .ThenBy(item => item.Position).First();
             string left = expression[..selected.Position].Trim();
             string right = expression[(selected.Position + selected.Native.Name.Length)..].Trim();
