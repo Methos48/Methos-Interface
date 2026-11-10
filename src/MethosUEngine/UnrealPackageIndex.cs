@@ -261,6 +261,9 @@ public sealed class UnrealPackageIndex
             throw new InvalidDataException($"Datos truncados o fuera del archivo al leer {label} (offset {offset}, tamaño {length}).");
     }
 
+    internal byte[] CopyOriginalSlice(int offset, int length) => _data.AsSpan(offset, length).ToArray();
+    internal int OriginalLength => _data.Length;
+
     private static ushort U16(byte[] d, int p) => BinaryPrimitives.ReadUInt16LittleEndian(d.AsSpan(p, 2));
     private static uint U32(byte[] d, int p) => BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(p, 4));
     private static int I32(byte[] d, int p) => BinaryPrimitives.ReadInt32LittleEndian(d.AsSpan(p, 4));
