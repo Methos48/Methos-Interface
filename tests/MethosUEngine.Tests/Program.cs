@@ -338,6 +338,46 @@ Assert(stateBoundaryRepair.Repairs.Count == 1 &&
 Assert(UnrealScriptSourceIndex.ParseFunctions(stateBoundaryRepair.Source).Count == 2,
     "The source with a state declaration did not parse after closure repair.");
 
+string orphanCloseSource = """
+class OrphanClose extends Object;
+function First()
+{
+    return;
+}
+}
+function Second()
+{
+    return;
+}
+""";
+var orphanCloseRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(orphanCloseSource);
+Assert(orphanCloseRepair.Repairs.Any(item => item.ClosuresRemoved == 1) &&
+    !orphanCloseRepair.Source.Contains("}\n}\nfunction Second", StringComparison.Ordinal),
+    "An orphan class-level closing brace was not removed.");
+Assert(UnrealScriptSourceIndex.ParseFunctions(orphanCloseRepair.Source).Count == 2,
+    "The source with an orphan class-level brace did not parse after repair.");
+
+string validStateCloseSource = """
+class ValidStateClose extends Object;
+state Active
+{
+    function First()
+    {
+        return;
+    }
+}
+function Second()
+{
+    return;
+}
+""";
+var validStateCloseRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(validStateCloseSource);
+Assert(validStateCloseRepair.Repairs.All(item => item.ClosuresRemoved == 0) &&
+    validStateCloseRepair.Source.Contains("state Active", StringComparison.Ordinal),
+    "A valid state-closing brace was incorrectly removed.");
+Assert(UnrealScriptSourceIndex.ParseFunctions(validStateCloseRepair.Source).Count == 2,
+    "A valid state declaration did not survive closure repair.");
+
 string brokenBeforeDefaults = """
 class BrokenDefaults extends Object;
 function First()
