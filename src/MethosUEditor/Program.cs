@@ -296,6 +296,10 @@ internal sealed class MainForm : Form
                                 source, referenceSource, out int restoredEnumArguments);
                             if (restoredEnumArguments > 0)
                                 Log($"Constantes enum restauradas desde la referencia Interlude: {safeName}.uc; argumentos={restoredEnumArguments}.");
+                            source = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
+                                source, referenceSource, out int restoredCallsiteArguments);
+                            if (restoredCallsiteArguments > 0)
+                                Log($"Argumentos simbólicos recuperados desde llamadas originales: {safeName}.uc; argumentos={restoredCallsiteArguments}.");
                         }
                         catch (Exception referenceError)
                         {
