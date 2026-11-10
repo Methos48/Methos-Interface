@@ -161,55 +161,12 @@ public static class UnrealScriptSourceIndex
             repairs.Add(new ClosureRepair("orphan", orphan.Line, 0, 1));
         }
 
-        repaired = RemoveRedundantTrailingBareReturns(repaired);
+        repaired = RemoveRedundantTrailingReturns(repaired).Source;
 
         // Fail closed if the repaired copy is still structurally incomplete.
         _ = ParseFunctions(repaired);
         repairs.Reverse();
         return new ClosureRepairResult(repaired, repairs);
-    }
-
-    private static string RemoveRedundantTrailingBareReturns(string source)
-    {
-        List<Token> tokens = Tokenize(source);
-        var removals = new List<(int Start, int Length)>();
-        foreach (var header in FindFunctionHeaders(tokens))
-        {
-            if (header.BodyOpenIndex < 0) continue;
-            int depth = 0, bodyEnd = -1;
-            for (int i = header.BodyOpenIndex; i < tokens.Count; i++)
-            {
-                if (tokens[i].Text == "{") depth++;
-                else if (tokens[i].Text == "}" && --depth == 0)
-                {
-                    bodyEnd = i;
-                    break;
-                }
-            }
-            if (bodyEnd < 0) continue;
-
-            for (int i = header.BodyOpenIndex + 1; i + 2 <= bodyEnd; i++)
-            {
-                if (!tokens[i].Text.Equals("return", StringComparison.OrdinalIgnoreCase) ||
-                    tokens[i + 1].Text != ";" || i + 2 != bodyEnd ||
-                    tokens[i - 1].Text != ";")
-                    continue;
-
-                int previousStatementStart = i - 2;
-                while (previousStatementStart > header.BodyOpenIndex &&
-                       tokens[previousStatementStart].Text is not (";" or "{" or "}"))
-                    previousStatementStart--;
-                previousStatementStart++;
-
-                if (tokens[previousStatementStart].Text.Equals("return", StringComparison.OrdinalIgnoreCase) &&
-                    previousStatementStart + 1 < i - 1)
-                    removals.Add((tokens[i].Start, tokens[i + 1].End - tokens[i].Start));
-            }
-        }
-
-        foreach (var removal in removals.OrderByDescending(item => item.Start))
-            source = source.Remove(removal.Start, removal.Length);
-        return source;
     }
 
     private static bool IsDeclarationBoundary(IReadOnlyList<Token> tokens, int index)
