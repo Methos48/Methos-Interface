@@ -167,7 +167,11 @@ internal sealed class MainForm : Form
             var targetName = folderName.Contains("interface", StringComparison.OrdinalIgnoreCase) ? "Interface" : folderName;
             var target = Path.Combine(PartsDir, targetName);
             Directory.CreateDirectory(target);
-            foreach (var src in ucFiles) File.Copy(src, Path.Combine(target, Path.GetFileName(src)), true);
+            foreach (var src in ucFiles)
+            {
+                var dst = Path.Combine(target, Path.GetFileName(src));
+                if (!SamePath(src, dst)) CopyWithBackup(src, dst);
+            }
             Log($"Importadas {ucFiles.Length} clases .uc.");
         }
     }
@@ -210,7 +214,7 @@ internal sealed class MainForm : Form
                 var source = obj.Decompile();
                 var objectName = obj.Name?.ToString() ?? $"Class_{ok}";
                 var safeName = string.Concat(objectName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-                File.WriteAllText(Path.Combine(output, safeName + ".uc"), source, new UTF8Encoding(false));
+                SaveTextWithBackup(Path.Combine(output, safeName + ".uc"), source);
                 ok++;
             }
             catch (Exception ex) { failed++; Log($"No se pudo exportar una clase: {ex.Message}"); }
@@ -341,6 +345,19 @@ internal sealed class MainForm : Form
             File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
         foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.TopDirectoryOnly))
             CopyDirectory(dir, Path.Combine(destination, Path.GetFileName(dir)));
+    }
+
+    private static void SaveTextWithBackup(string destination, string content)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        if (File.Exists(destination))
+        {
+            var backup = Path.Combine(Path.GetDirectoryName(destination)!, "backups");
+            Directory.CreateDirectory(backup);
+            var backupName = Path.GetFileNameWithoutExtension(destination) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + Path.GetExtension(destination);
+            File.Copy(destination, Path.Combine(backup, backupName), true);
+        }
+        File.WriteAllText(destination, content, new UTF8Encoding(false));
     }
 
     private static void CopyWithBackup(string source, string destination)
