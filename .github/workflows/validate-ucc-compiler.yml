@@ -72,6 +72,17 @@ jobs:
           $output = Join-Path $env:KIT "Testar\system\Interface.u"
           & $validator -PackagePath $output
 
+      - name: Comprobar si UCC recompila el Interface.u original de forma idéntica
+        shell: pwsh
+        run: |
+          $generated = Join-Path $env:KIT "Testar\system\Interface.u"
+          $original = Join-Path $PWD "Interface.u"
+          $generatedHash = (Get-FileHash -LiteralPath $generated -Algorithm SHA256).Hash
+          $originalHash = (Get-FileHash -LiteralPath $original -Algorithm SHA256).Hash
+          Write-Host "UCC_REBUILD_SHA256=$generatedHash"
+          Write-Host "ORIGINAL_INTERFACE_SHA256=$originalHash"
+          Write-Host "UCC_REBUILD_EXACT_MATCH=$($generatedHash -eq $originalHash)"
+
       - name: Descompilar el Interface.u real para probar el recorrido completo
         shell: pwsh
         run: |
