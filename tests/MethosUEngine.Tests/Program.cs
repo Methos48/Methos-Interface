@@ -198,6 +198,29 @@ Assert(assignmentCode.SequenceEqual(new byte[]
 }), "Assignment bytecode token order or object references are incorrect.");
 Assert(assignmentSource.Replace("\r\n", "\n") == "Health = LocalValue;\nreturn Health;",
     "Variable assignment and return source/bytecode round trip failed.");
+var nativeOperators = new[]
+{
+    new UnrealScriptNativeFunction(0x70, "+", UnrealScriptNativeFunctionKind.Operator, 10),
+    new UnrealScriptNativeFunction(0x71, "*", UnrealScriptNativeFunctionKind.Operator, 20)
+};
+byte[] nativeOperatorCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return A + 1;",
+    variableResolver: _ => new UnrealScriptVariableReference(0x00, 12),
+    nativeFunctions: nativeOperators);
+Assert(nativeOperatorCode.SequenceEqual(new byte[]
+{
+    0x04, 0x70, 0x00, 12, 0, 0, 0, 0x26, 0x16, 0x47
+}), "Native binary operator bytecode is incorrect.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(nativeOperatorCode,
+    objectResolver: reference => reference == 12 ? "A" : throw new InvalidDataException(),
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return A + 1;",
+    "Native operator source/bytecode round trip failed.");
+byte[] precedenceCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return A + B * 2;",
+    variableResolver: name => new UnrealScriptVariableReference(0x00, name == "A" ? 12 : 13),
+    nativeFunctions: nativeOperators);
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(precedenceCode,
+    objectResolver: reference => reference switch { 12 => "A", 13 => "B", _ => throw new InvalidDataException() },
+    nativeResolver: token => nativeOperators.FirstOrDefault(item => item.Token == token)) == "return A + B * 2;",
+    "Native operator precedence was not preserved.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
     "Native compilation modified the original package bytes.");
