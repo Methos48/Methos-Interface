@@ -200,11 +200,16 @@ internal sealed class MainForm : Form
             // UELib remains the compatibility reader while the native compiler is developed.
             Log($"Aviso del analizador independiente: {ex.Message}");
         }
+        UnrealPackageIndex? nativeIndex = null;
+        byte[] packageBytes = File.ReadAllBytes(path);
+        try { nativeIndex = UnrealPackageIndex.Parse(packageBytes); }
+        catch (Exception ex) { Log($"Aviso: descompilador nativo no disponible para este paquete: {ex.Message}"); }
+
         using var package = UnrealLoader.LoadPackage(path, FileAccess.Read);
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
-        int ok = 0, failed = 0, repairedFunctions = 0, insertedClosures = 0;
+        int ok = 0, failed = 0, repairedFunctions = 0, insertedClosures = 0, nativeFunctions = 0;
         foreach (var obj in classes)
         {
             try
@@ -234,14 +239,86 @@ internal sealed class MainForm : Form
                     Log($"Aviso: no se pudo verificar/reparar la estructura de {safeName}.uc; se conserva la salida original. {repairError.Message}");
                 }
 
+                if (nativeIndex != null)
+                {
+                    source = ApplyNativeBytecodeDecompilation(
+                        source, obj, package, nativeIndex, packageBytes, out int nativeDecoded);
+                    nativeFunctions += nativeDecoded;
+                    if (nativeDecoded > 0)
+                        Log($"Descompilación nativa verificada: {safeName}.uc; funciones={nativeDecoded}.");
+                }
+
                 SaveTextWithBackup(Path.Combine(output, safeName + ".uc"), source);
                 ok++;
             }
             catch (Exception ex) { failed++; Log($"No se pudo exportar una clase: {ex.Message}"); }
         }
-        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}. Carpeta: {output}");
+        Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}; funciones descompiladas/verificadas por Methos: {nativeFunctions}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
     });
+
+    private static string ApplyNativeBytecodeDecompilation(string source, UClass classObject,
+        UnrealPackage metadataPackage, UnrealPackageIndex packageIndex, byte[] packageBytes,
+        out int nativeDecoded)
+    {
+        nativeDecoded = 0;
+        var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(source);
+        var classFunctions = metadataPackage.Objects.OfType<UFunction>()
+            .Where(function => IsOwnedByClass(function, classObject)).ToList();
+        var replacements = new List<(int Start, int Length, string Body)>();
+
+        foreach (var sourceFunction in sourceFunctions)
+        {
+            var matches = classFunctions.Where(function =>
+                string.Equals(function.Name.ToString(), sourceFunction.Name, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length != 1) continue;
+
+            var function = matches[0];
+            if (function.ExportTable == null) continue;
+            int exportReference = (int)function;
+            if (exportReference < 1 || exportReference > packageIndex.Exports.Count) continue;
+            var export = packageIndex.Exports[exportReference - 1];
+            long relativeLong = function.ScriptOffset - function.ExportTable.SerialOffset;
+            if (relativeLong < 4 || relativeLong > int.MaxValue || relativeLong > export.SerialSize - 4) continue;
+            int relative = (int)relativeLong;
+            int sizeOffset = checked(export.SerialOffset + relative - 4);
+            if (sizeOffset < 0 || sizeOffset > packageBytes.Length - 4) continue;
+            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
+            if (scriptSize < 0 || relative > export.SerialSize - scriptSize) continue;
+
+            try
+            {
+                string nativeSource = UnrealScriptFunctionDecompiler.DecompileExport(
+                    packageIndex, exportReference, relative, scriptSize);
+                byte[] originalBytecode = packageBytes.AsSpan(
+                    checked(export.SerialOffset + relative), scriptSize).ToArray();
+                byte[] rebuiltBytecode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody(
+                    sourceFunction.Body, name =>
+                    {
+                        for (int i = 0; i < packageIndex.Names.Count; i++)
+                            if (string.Equals(packageIndex.Names[i], name, StringComparison.OrdinalIgnoreCase))
+                                return i;
+                        throw new InvalidDataException($"La constante Name '{name}' no existe en la tabla del paquete.");
+                    });
+
+                // Only replace the source text when the native compiler recreates the exact original bytecode.
+                // This makes the native decompiler a verified round-trip, not a guess based on formatting.
+                if (!rebuiltBytecode.AsSpan().SequenceEqual(originalBytecode)) continue;
+                replacements.Add((sourceFunction.BodyOffset, sourceFunction.BodyLength,
+                    Environment.NewLine + "        " + nativeSource + Environment.NewLine + "    "));
+            }
+            catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or EndOfStreamException or ArgumentOutOfRangeException)
+            {
+                // Unsupported bytecode stays exactly as emitted by the compatibility decompiler.
+            }
+        }
+
+        foreach (var replacement in replacements.OrderByDescending(item => item.Start))
+            source = source.Remove(replacement.Start, replacement.Length)
+                .Insert(replacement.Start, replacement.Body);
+        nativeDecoded = replacements.Count;
+        return source;
+    }
 
     private Task CompileFolder(string packagePath) => Task.Run(() =>
     {
