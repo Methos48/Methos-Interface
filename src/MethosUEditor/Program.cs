@@ -132,19 +132,21 @@ internal sealed class MainForm : Form
         using var d = new FolderBrowserDialog { Description = "Selecciona una carpeta con archivos .u o clases .uc" };
         if (d.ShowDialog() != DialogResult.OK) return;
         var uFiles = Directory.GetFiles(d.SelectedPath, "*.u", SearchOption.AllDirectories);
-        if (uFiles.Length > 0)
+        var ucFiles = Directory.GetFiles(d.SelectedPath, "*.uc", SearchOption.AllDirectories);
+        if (uFiles.Length == 0 && ucFiles.Length == 0)
         {
-            foreach (var src in uFiles)
-            {
-                var dst = Path.Combine(CompleteDir, Path.GetFileName(src));
-                if (!SamePath(src, dst)) CopyWithBackup(src, dst);
-            }
-            RefreshInputs();
+            MessageBox.Show("No se encontraron archivos .u ni .uc.");
+            return;
         }
-        else
+
+        foreach (var src in uFiles)
         {
-            var ucFiles = Directory.GetFiles(d.SelectedPath, "*.uc", SearchOption.AllDirectories);
-            if (ucFiles.Length == 0) { MessageBox.Show("No se encontraron archivos .u ni .uc."); return; }
+            var dst = Path.Combine(CompleteDir, Path.GetFileName(src));
+            if (!SamePath(src, dst)) CopyWithBackup(src, dst);
+        }
+
+        if (ucFiles.Length > 0)
+        {
             var folderName = new DirectoryInfo(d.SelectedPath).Name;
             var targetName = folderName.Contains("interface", StringComparison.OrdinalIgnoreCase) ? "Interface" : folderName;
             var target = Path.Combine(PartsDir, targetName);
@@ -154,8 +156,10 @@ internal sealed class MainForm : Form
                 var dst = Path.Combine(target, Path.GetFileName(src));
                 if (!SamePath(src, dst)) CopyWithBackup(src, dst);
             }
-            Log($"Importadas {ucFiles.Length} clases .uc.");
         }
+
+        RefreshInputs();
+        Log($"Carpeta importada: {uFiles.Length} paquetes .u y {ucFiles.Length} clases .uc.");
     }
 
     private async Task RunSelectedAsync(Func<string, Task> action)
