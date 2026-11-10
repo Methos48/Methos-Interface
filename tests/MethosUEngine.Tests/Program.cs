@@ -779,27 +779,27 @@ if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Dire
         StringComparer.OrdinalIgnoreCase);
     foreach (string sourcePath in interludeSourceFiles)
     {
-        string className = Path.GetFileNameWithoutExtension(sourcePath);
-        if (!interludeClasses.TryGetValue(className, out var classObject))
+        string uccClassName = Path.GetFileNameWithoutExtension(sourcePath);
+        if (!interludeClasses.TryGetValue(uccClassName, out var classObject))
         {
             sourceMissing++;
-            sourceMissingExamples.Add(className);
+            sourceMissingExamples.Add(uccClassName);
             continue;
         }
         sourceMatches++;
         string sourceText = File.ReadAllText(sourcePath);
         var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(
             UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText).Source);
-        var targets = interludeFunctionMap[className];
+        var targets = interludeFunctionMap[uccClassName];
         var targetNames = targets.Select(target => target.Name.ToString()).ToArray();
         sourceDuplicateFunctions += targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
             .Count(group => group.Count() > 1);
         var targetNameSet = targetNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var missingFunctions = sourceFunctions.Where(item => !targetNameSet.Contains(item.Name)).ToArray();
         sourceUnmappedFunctions += missingFunctions.Length;
-        sourceUnmappedExamples.AddRange(missingFunctions.Take(4).Select(item => className + "." + item.Name));
+        sourceUnmappedExamples.AddRange(missingFunctions.Take(4).Select(item => uccClassName + "." + item.Name));
         sourceDuplicateExamples.AddRange(targetNames.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1).Select(group => className + "." + group.Key));
+            .Where(group => group.Count() > 1).Select(group => uccClassName + "." + group.Key));
     }
     Console.WriteLine($"UCC SOURCE MAP: classes matched={sourceMatches}/{interludeSourceFiles.Length}; missing classes={sourceMissing}; source functions without target={sourceUnmappedFunctions}; duplicate target names={sourceDuplicateFunctions}.");
     Console.WriteLine("UCC MISSING CLASSES: " + string.Join(", ", sourceMissingExamples.Take(25)));
