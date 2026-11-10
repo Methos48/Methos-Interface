@@ -14,6 +14,7 @@ public static class UnrealScriptFunctionDecompiler
     private const byte EX_InstanceVariable = 0x01;
     private const byte EX_DefaultVariable = 0x02;
     private const byte EX_Return = 0x04;
+    private const byte EX_Let = 0x0F;
     private const byte EX_IntConst = 0x1D;
     private const byte EX_FloatConst = 0x1E;
     private const byte EX_StringConst = 0x1F;
@@ -36,25 +37,46 @@ public static class UnrealScriptFunctionDecompiler
             throw new InvalidDataException("El bytecode no termina con EndOfScript.");
 
         int position = 0;
-        byte statement = ReadByte(bytecode, ref position);
-        string result;
-        if (statement == EX_ReturnNothing)
+        var statements = new List<string>();
+        bool sawReturn = false;
+        while (position < bytecode.Length)
         {
-            result = "return;";
-        }
-        else if (statement == EX_Return)
-        {
-            string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
-            result = $"return {expression};";
-        }
-        else
-        {
-            throw new NotSupportedException($"Instrucción inicial de bytecode no admitida: 0x{statement:X2}.");
+            byte token = ReadByte(bytecode, ref position);
+            if (token == EX_EndOfScript)
+            {
+                if (position != bytecode.Length)
+                    throw new InvalidDataException("Hay bytes después de EndOfScript.");
+                break;
+            }
+            if (sawReturn)
+                throw new NotSupportedException("El bytecode contiene instrucciones después de return.");
+
+            if (token == EX_ReturnNothing)
+            {
+                statements.Add("return;");
+                sawReturn = true;
+            }
+            else if (token == EX_Return)
+            {
+                string expression = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                statements.Add($"return {expression};");
+                sawReturn = true;
+            }
+            else if (token == EX_Let)
+            {
+                string left = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                string right = ReadLiteral(bytecode, ref position, nameResolver, objectResolver);
+                statements.Add($"{left} = {right};");
+            }
+            else
+            {
+                throw new NotSupportedException($"Instrucción de bytecode no admitida: 0x{token:X2}.");
+            }
         }
 
-        if (ReadByte(bytecode, ref position) != EX_EndOfScript || position != bytecode.Length)
-            throw new NotSupportedException("El bytecode contiene instrucciones adicionales fuera del subconjunto de descompilación actual.");
-        return result;
+        if (!sawReturn)
+            throw new InvalidDataException("El bytecode no contiene una instrucción return.");
+        return string.Join(Environment.NewLine, statements);
     }
 
     public static string DecompileExport(UnrealPackageIndex package, int exportReference,
