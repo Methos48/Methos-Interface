@@ -18,74 +18,45 @@ public static class UnrealScriptCallsiteArgumentRestorer
         ArgumentNullException.ThrowIfNull(referenceSource);
         restored = 0;
 
+        var currentCalls = ReadCalls(decompiledSource);
         var referenceCalls = ReadCalls(referenceSource);
-        var occurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var mask = BuildCodeMask(decompiledSource);
         var edits = new List<(int Start, int Length, string Value)>();
 
-        for (int i = 0; i < decompiledSource.Length;)
+        foreach (var entry in currentCalls)
         {
-            if (!mask[i] || !(char.IsLetter(decompiledSource[i]) || decompiledSource[i] == '_'))
+            if (!referenceCalls.TryGetValue(entry.Key, out var referenceSites)) continue;
+            var currentSites = entry.Value;
+            int count = Math.Min(currentSites.Count, referenceSites.Count);
+            for (int occurrence = 0; occurrence < count; occurrence++)
             {
-                i++;
-                continue;
+                var currentArguments = currentSites[occurrence].Arguments;
+                var referenceArguments = referenceSites[occurrence].Arguments;
+                if (currentArguments.Count != referenceArguments.Count) continue;
+
+                for (int argumentIndex = 0; argumentIndex < currentArguments.Count; argumentIndex++)
+                {
+                    var currentArgument = currentArguments[argumentIndex];
+                    string currentValue = currentArgument.Text.Trim();
+                    string originalValue = referenceArguments[argumentIndex].Text.Trim();
+                    if (!int.TryParse(currentValue, out _) ||
+                        !Regex.IsMatch(originalValue, @"^(?:[A-Za-z_]\\w*\\.)*[A-Za-z_]\\w*$",
+                            RegexOptions.CultureInvariant))
+                        continue;
+
+                    int start = currentArgument.Start;
+                    while (start < currentArgument.End && char.IsWhiteSpace(decompiledSource[start])) start++;
+                    edits.Add((start, currentValue.Length, originalValue));
+                }
             }
-
-            int nameStart = i++;
-            while (i < decompiledSource.Length && mask[i] &&
-                   (char.IsLetterOrDigit(decompiledSource[i]) || decompiledSource[i] == '_')) i++;
-            string name = decompiledSource[nameStart..i];
-
-            int open = i;
-            while (open < decompiledSource.Length && char.IsWhiteSpace(decompiledSource[open])) open++;
-            if (open >= decompiledSource.Length || decompiledSource[open] != '(') continue;
-            if (Regex.IsMatch(decompiledSource[..nameStart], @"\b(function|event)\s*$",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) continue;
-
-            int close = FindMatchingParen(decompiledSource, open);
-            if (close < 0) continue;
-            var currentArgs = SplitArguments(decompiledSource, open + 1, close);
-            int occurrence = occurrences.TryGetValue(name, out int seen) ? seen : 0;
-            occurrences[name] = occurrence + 1;
-
-            if (!referenceCalls.TryGetValue(name, out var candidates) || occurrence >= candidates.Count)
-            {
-                i = close + 1;
-                continue;
-            }
-
-            var referenceArgs = candidates[occurrence].Arguments;
-            if (referenceArgs.Count != currentArgs.Count)
-            {
-                i = close + 1;
-                continue;
-            }
-
-            for (int argIndex = 0; argIndex < currentArgs.Count; argIndex++)
-            {
-                var range = currentArgs[argIndex];
-                string current = decompiledSource[range.Start..range.End].Trim();
-                string original = referenceArgs[argIndex].Text.Trim();
-                if (!int.TryParse(current, out _) ||
-                    !Regex.IsMatch(original, @"^(?:[A-Za-z_]\w*\.)*[A-Za-z_]\w*$",
-                        RegexOptions.CultureInvariant)) continue;
-
-                int start = range.Start;
-                while (start < range.End && char.IsWhiteSpace(decompiledSource[start])) start++;
-                edits.Add((start, current.Length, original));
-            }
-
-            i = close + 1;
         }
 
         string result = decompiledSource;
-        foreach (var edit in edits.OrderByDescending(x => x.Start))
-        {
+        foreach (var edit in edits.OrderByDescending(item => item.Start))
             result = result.Remove(edit.Start, edit.Length).Insert(edit.Start, edit.Value);
-            restored++;
-        }
+        restored = edits.Count;
         return result;
     }
+
 
     public static string RestoreSymbolicAssignments(string decompiledSource, string referenceSource, out int restored)
     {
