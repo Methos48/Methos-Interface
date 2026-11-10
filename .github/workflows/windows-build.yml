@@ -44,6 +44,26 @@ jobs:
           print(json.dumps(report, indent=2, ensure_ascii=False))
           PY
 
+      - name: Preparar paquete de fuentes para ingenieria inversa
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib, zipfile
+          out = pathlib.Path("source-inputs.zip")
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+              for name in ("Interface.u", "Carpeta interface.u.zip"):
+                  p = pathlib.Path(name)
+                  if p.exists():
+                      z.write(p, name)
+          PY
+
+      - name: Publicar fuentes originales para analisis
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-u-source-inputs
+          path: source-inputs.zip
+          if-no-files-found: error
+
       - name: Publicar informe de analisis
         uses: actions/upload-artifact@v4
         with:
