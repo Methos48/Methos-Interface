@@ -146,8 +146,7 @@ public static class UnrealScriptFunctionCompiler
                 {
                     char c = source[i++];
                     output.Append(c);
-                    if (c == '\\' && i < source.Length) output.Append(source[i++]);
-                    else if (c == quote) break;
+                    if (c == quote) break;
                 }
                 continue;
             }
@@ -180,22 +179,7 @@ public static class UnrealScriptFunctionCompiler
         return output.ToString();
     }
 
-    private static string DecodeEscapes(string value)
-    {
-        var output = new StringBuilder(value.Length);
-        for (int i = 0; i < value.Length; i++)
-        {
-            if (value[i] != '\\' || i + 1 >= value.Length) { output.Append(value[i]); continue; }
-            char escaped = value[++i];
-            output.Append(escaped switch
-            {
-                'n' => '\n', 'r' => '\r', 't' => '\t', 'b' => '\b',
-                'f' => '\f', 'v' => '\v', '\\' => '\\', '"' => '"', '\'' => '\'',
-                _ => escaped
-            });
-        }
-        return output.ToString();
-    }
+    private static string DecodeEscapes(string value) => value;
 
     private static void WriteInt32(Stream output, int value)
     {
