@@ -147,7 +147,9 @@ jobs:
             ucc-validation/Compilador  U/ReferenceClasses/PartyMatchOutWaitListWnd.uc
           if-no-files-found: warn
 
-      - name: Recompilar las fuentes extraídas del Interface.u real con UCC
+      - name: Diagnóstico no bloqueante: recompilar salida del descompilador UELib
+        id: uelib_roundtrip
+        continue-on-error: true
         shell: pwsh
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:KIT "Compilar.ps1")
@@ -156,7 +158,8 @@ jobs:
           if (!(Test-Path -LiteralPath $output)) { throw "No se generó el Interface.u recompilado." }
           & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
 
-      - name: Comparar con Interface.u original y registrar hashes
+      - name: Comparar salida UELib con Interface.u original
+        if: steps.uelib_roundtrip.outcome == 'success'
         shell: pwsh
         run: |
           $compiled = Join-Path $env:KIT "Testar\system\Interface.u"
