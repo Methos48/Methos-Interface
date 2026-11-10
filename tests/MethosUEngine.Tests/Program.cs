@@ -275,7 +275,7 @@ Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 1.5f;")
     .SequenceEqual(new byte[] { 0x04, 0x1E, 0x00, 0x00, 0xC0, 0x3F, 0x47 }), "Float return bytecode is incorrect.");
 Assert(UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"界\";")
     .SequenceEqual(new byte[] { 0x04, 0x34, 0x4C, 0x75, 0, 0, 0x47 }), "Unicode string return bytecode is incorrect.");
-byte[] pathLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "..\L2text\";""");
+byte[] pathLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("""return "..\\L2text\\\\";""");
 byte[] quoteLiteralCode = UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"\"\";");
 Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(quoteLiteralCode) == "return \"\"\";",
     "Triple-quote string literal was not preserved.");
@@ -405,7 +405,7 @@ function int Add(int A, int B)
     // } must not close the function
     local string S;
     S = "}";
-    S = "..\L2text\";
+    S = "..\\L2text\\\\";
     if (A > 0) { return A + B; }
     /* } nested-looking comment */
     return 0;
