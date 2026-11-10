@@ -129,7 +129,6 @@ public static class UnrealScriptSourceIndex
                 int start = i++;
                 while (i < source.Length)
                 {
-                    if (source[i] == '\\') { i = Math.Min(source.Length, i + 2); continue; }
                     if (source[i] == '\n') line++;
                     if (source[i++] == quote) break;
                 }
