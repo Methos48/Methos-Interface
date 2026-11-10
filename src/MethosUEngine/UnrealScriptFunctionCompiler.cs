@@ -161,14 +161,17 @@ public static class UnrealScriptFunctionCompiler
             if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '*')
             {
                 i += 2;
-                bool closed = false;
-                while (i + 1 < source.Length)
+                int commentDepth = 1;
+                while (i < source.Length && commentDepth > 0)
                 {
-                    if (source[i] == '*' && source[i + 1] == '/') { i += 2; closed = true; break; }
+                    if (source[i] == '/' && i + 1 < source.Length && source[i + 1] == '*')
+                    { commentDepth++; i += 2; continue; }
+                    if (source[i] == '*' && i + 1 < source.Length && source[i + 1] == '/')
+                    { commentDepth--; i += 2; continue; }
                     if (source[i] == '\n') output.Append('\n');
                     i++;
                 }
-                if (!closed) throw new InvalidDataException("Comentario de bloque sin cerrar.");
+                if (commentDepth != 0) throw new InvalidDataException("Comentario de bloque sin cerrar.");
                 output.Append(' ');
                 continue;
             }
