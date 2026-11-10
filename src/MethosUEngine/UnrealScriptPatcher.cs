@@ -9,7 +9,8 @@ namespace MethosUEngine;
 public static class UnrealScriptPatcher
 {
     public static byte[] ReplaceBytecode(byte[] exportPayload, ushort packageVersion,
-        int scriptOffsetRelative, int originalScriptSize, byte[] newBytecode)
+        int scriptOffsetRelative, int originalScriptSize, byte[] newBytecode,
+        int? originalVirtualScriptSize = null, int? newVirtualScriptSize = null)
     {
         ArgumentNullException.ThrowIfNull(exportPayload);
         ArgumentNullException.ThrowIfNull(newBytecode);
@@ -22,8 +23,10 @@ public static class UnrealScriptPatcher
         if (sizeFieldOffset > exportPayload.Length - 4)
             throw new InvalidDataException("El campo de tamaño del bytecode está fuera del objeto.");
         int storedSize = BinaryPrimitives.ReadInt32LittleEndian(exportPayload.AsSpan(sizeFieldOffset, 4));
-        if (storedSize != originalScriptSize)
-            throw new InvalidDataException($"El tamaño del bytecode no coincide: el paquete declara {storedSize}, el lector reporta {originalScriptSize}. Se cancela la modificación.");
+        if (originalVirtualScriptSize.HasValue && storedSize != originalVirtualScriptSize.Value)
+            throw new InvalidDataException($"El tamaño virtual del bytecode no coincide: el paquete declara {storedSize}, el lector reporta {originalVirtualScriptSize.Value}. Se cancela la modificación.");
+        if (storedSize < 0)
+            throw new InvalidDataException("El tamaño virtual del bytecode es negativo.");
 
         if (scriptOffsetRelative > exportPayload.Length - originalScriptSize)
             throw new InvalidDataException("El bytecode original excede los límites del objeto.");
@@ -31,14 +34,15 @@ public static class UnrealScriptPatcher
         int suffixOffset = checked(scriptOffsetRelative + originalScriptSize);
         using var output = new MemoryStream(checked(exportPayload.Length - originalScriptSize + newBytecode.Length));
         output.Write(exportPayload, 0, sizeFieldOffset);
-        WriteInt32(output, newBytecode.Length);
+        WriteInt32(output, newVirtualScriptSize ?? newBytecode.Length);
         output.Write(newBytecode);
         output.Write(exportPayload, suffixOffset, exportPayload.Length - suffixOffset);
         return output.ToArray();
     }
 
     public static void ReplaceExportBytecode(UnrealPackageIndex package, UnrealPackageBuilder builder,
-        int exportReference, int scriptOffsetRelative, int originalScriptSize, byte[] newBytecode)
+        int exportReference, int scriptOffsetRelative, int originalScriptSize, byte[] newBytecode,
+        int? originalVirtualScriptSize = null, int? newVirtualScriptSize = null)
     {
         ArgumentNullException.ThrowIfNull(package);
         ArgumentNullException.ThrowIfNull(builder);
@@ -49,7 +53,8 @@ public static class UnrealScriptPatcher
             throw new InvalidDataException("El export no contiene datos serializados.");
         byte[] payload = package.CopyOriginalSlice(export.SerialOffset, export.SerialSize);
         byte[] patched = ReplaceBytecode(payload, package.Summary.Version,
-            scriptOffsetRelative, originalScriptSize, newBytecode);
+            scriptOffsetRelative, originalScriptSize, newBytecode,
+            originalVirtualScriptSize, newVirtualScriptSize);
         builder.ReplaceExportPayload(exportReference, patched);
     }
 
