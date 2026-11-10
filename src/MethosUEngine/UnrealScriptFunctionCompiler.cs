@@ -157,13 +157,6 @@ public static class UnrealScriptFunctionCompiler
         int i = 0;
         while (i < source.Length)
         {
-            if (source[i] == '"' && i + 2 < source.Length &&
-                source[i + 1] == '"' && source[i + 2] == '"')
-            {
-                output.Append("\"\"\"");
-                i += 3;
-                continue;
-            }
             if (source[i] is '"' or '\'')
             {
                 char quote = source[i];
@@ -172,6 +165,11 @@ public static class UnrealScriptFunctionCompiler
                 {
                     char c = source[i++];
                     output.Append(c);
+                    if (c == '\\' && i < source.Length)
+                    {
+                        output.Append(source[i++]);
+                        continue;
+                    }
                     if (c == quote) break;
                 }
                 continue;
@@ -205,7 +203,31 @@ public static class UnrealScriptFunctionCompiler
         return output.ToString();
     }
 
-    private static string DecodeEscapes(string value) => value;
+    private static string DecodeEscapes(string value)
+    {
+        var output = new StringBuilder(value.Length);
+        for (int i = 0; i < value.Length; i++)
+        {
+            if (value[i] != '\\' || i + 1 >= value.Length)
+            {
+                output.Append(value[i]);
+                continue;
+            }
+
+            char next = value[++i];
+            switch (next)
+            {
+                case '\\': output.Append('\\'); break;
+                case '"': output.Append('"'); break;
+                case '\'': output.Append('\''); break;
+                case 'n': output.Append('\n'); break;
+                case 'r': output.Append('\r'); break;
+                case 't': output.Append('\t'); break;
+                default: output.Append('\\').Append(next); break;
+            }
+        }
+        return output.ToString();
+    }
 
     private static void WriteInt32(Stream output, int value)
     {
