@@ -1,0 +1,53 @@
+name: Methos U Editor - Analisis y compilacion Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analizar:
+    runs-on: windows-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Analizar archivos fuente
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python - <<'PY'
+          import hashlib, json, pathlib, struct, zipfile
+          root = pathlib.Path(".")
+          report = {"files": [], "zip_entries": [], "notes": []}
+          for p in sorted(root.iterdir()):
+              if p.is_file() and p.suffix.lower() in (".u", ".zip"):
+                  b = p.read_bytes()
+                  item = {"name": p.name, "size": len(b), "sha256": hashlib.sha256(b).hexdigest(),
+                          "first_32_bytes_hex": b[:32].hex(" ")}
+                  if p.suffix.lower() == ".u":
+                      item["first_u32_le"] = struct.unpack("<I", b[:4])[0] if len(b) >= 4 else None
+                      item["first_u32_be"] = struct.unpack(">I", b[:4])[0] if len(b) >= 4 else None
+                      item["contains_unreal_package_marker"] = b"Unreal" in b[:256]
+                  report["files"].append(item)
+                  if p.suffix.lower() == ".zip":
+                      with zipfile.ZipFile(p) as z:
+                          for i in z.infolist():
+                              report["zip_entries"].append({
+                                  "name": i.filename, "size": i.file_size,
+                                  "compressed_size": i.compress_size, "crc": f"{i.CRC:08x}",
+                                  "is_dir": i.is_dir()
+                              })
+          pathlib.Path("analysis-report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+          print(json.dumps(report, indent=2, ensure_ascii=False))
+          PY
+
+      - name: Publicar informe de analisis
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-u-analysis
+          path: analysis-report.json
+          if-no-files-found: error
