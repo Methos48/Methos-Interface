@@ -376,6 +376,106 @@ internal sealed class MainForm : Form
         return source;
     }
 
+    private bool TryRestoreExactSources(string packageName, byte[] packageBytes, string outputDirectory)
+    {
+        string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes));
+        string cachedDirectory = Path.Combine(SourceCacheRoot, hash, packageName);
+        if (Directory.Exists(cachedDirectory))
+        {
+            int cachedCount = GetSourceFiles(cachedDirectory).Length;
+            if (cachedCount > 0)
+            {
+                RestoreSourceDirectory(cachedDirectory, outputDirectory);
+                Log($"Fuentes exactas restauradas desde la caché de Methos: {cachedCount} clases; SHA-256={hash}.");
+                return true;
+            }
+        }
+
+        if (packageName.Equals("Interface", StringComparison.OrdinalIgnoreCase) &&
+            hash.Equals(OriginalInterfaceSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            string referenceDirectory = Path.Combine(UccRuntimeRoot, "Interlude", "Interface", "Classes");
+            if (Directory.Exists(referenceDirectory))
+            {
+                int referenceCount = GetSourceFiles(referenceDirectory).Length;
+                if (referenceCount >= 150)
+                {
+                    RestoreSourceDirectory(referenceDirectory, outputDirectory);
+                    Log($"Fuentes originales verificadas restauradas: {referenceCount} clases. El paquete coincide byte por byte con la referencia Interlude.");
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string[] GetSourceFiles(string directory)
+    {
+        if (!Directory.Exists(directory)) return Array.Empty<string>();
+        return Directory.GetFiles(directory, "*.uc", SearchOption.AllDirectories)
+            .Where(path => !Path.GetRelativePath(directory, path)
+                .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment.Equals("backups", StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static void RestoreSourceDirectory(string sourceDirectory, string outputDirectory)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        string[] sourceFiles = GetSourceFiles(sourceDirectory);
+        var expected = sourceFiles
+            .Select(path => Path.GetRelativePath(sourceDirectory, path))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string existing in GetSourceFiles(outputDirectory))
+        {
+            string relative = Path.GetRelativePath(outputDirectory, existing);
+            if (expected.Contains(relative)) continue;
+            BackupExistingFile(existing);
+            File.Delete(existing);
+        }
+
+        foreach (string source in sourceFiles)
+        {
+            string relative = Path.GetRelativePath(sourceDirectory, source);
+            string destination = Path.Combine(outputDirectory, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            CopyWithBackup(source, destination);
+        }
+    }
+
+    private void SaveSourceSnapshot(string packageName, byte[] packageBytes, string sourceDirectory)
+    {
+        string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes));
+        string destinationRoot = Path.Combine(SourceCacheRoot, hash, packageName);
+        if (Directory.Exists(destinationRoot)) Directory.Delete(destinationRoot, recursive: true);
+        Directory.CreateDirectory(destinationRoot);
+
+        foreach (string source in GetSourceFiles(sourceDirectory))
+        {
+            string relative = Path.GetRelativePath(sourceDirectory, source);
+            string destination = Path.Combine(destinationRoot, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination, overwrite: true);
+        }
+        Log($"Copia exacta de fuentes guardada en caché: {GetSourceFiles(sourceDirectory).Length} clases; SHA-256={hash}.");
+    }
+
+    private static void BackupExistingFile(string path)
+    {
+        if (!File.Exists(path)) return;
+        string backupRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Methos U Editor", "Backups", "Sources");
+        Directory.CreateDirectory(backupRoot);
+        string backupName = Path.GetFileNameWithoutExtension(path) + "_" +
+            DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(path);
+        File.Copy(path, Path.Combine(backupRoot, backupName), overwrite: true);
+    }
+
     private Task CompileFolder(string packagePath) => Task.Run(() =>
     {
         var baseName = Path.GetFileNameWithoutExtension(packagePath);
