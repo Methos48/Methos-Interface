@@ -691,7 +691,7 @@ if (args.Length > 1)
         using var stream = entry.Open();
         using var reader = new StreamReader(stream, System.Text.Encoding.UTF8, true);
         string sourceText = reader.ReadToEnd();
-        IReadOnlyList<UnrealScriptFunctionSource> functionsInSource;
+        IReadOnlyList<UnrealFunctionSource> functionsInSource;
         try
         {
             functionsInSource = UnrealScriptSourceIndex.ParseFunctions(sourceText);
@@ -911,7 +911,7 @@ if (args.Length > 4 && File.Exists(args[2]) && Directory.Exists(args[3]) && Dire
         }
         sourceMatches++;
         string sourceText = File.ReadAllText(sourcePath);
-        IReadOnlyList<UnrealScriptFunctionSource> sourceFunctions;
+        IReadOnlyList<UnrealFunctionSource> sourceFunctions;
         try
         {
             sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(sourceText);
