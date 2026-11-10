@@ -263,8 +263,7 @@ internal sealed class MainForm : Form
     {
         nativeDecoded = 0;
         var sourceFunctions = UnrealScriptSourceIndex.ParseFunctions(source);
-        var classFunctions = metadataPackage.Objects.OfType<UFunction>()
-            .Where(function => IsOwnedByClass(function, classObject)).ToList();
+        var classFunctions = EnumerateClassFunctions(classObject).ToList();
         var replacements = new List<(int Start, int Length, string Body)>();
 
         foreach (var sourceFunction in sourceFunctions)
@@ -439,11 +438,21 @@ internal sealed class MainForm : Form
         }
     });
 
-    private static bool IsOwnedByClass(UObject candidate, UClass owner)
+    private static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
     {
-        for (UObject? current = candidate.Outer; current != null; current = current.Outer)
-            if (ReferenceEquals(current, owner)) return true;
-        return false;
+        foreach (var field in owner.EnumerateFields())
+        {
+            if (field is UFunction function)
+            {
+                yield return function;
+                continue;
+            }
+            if (field is UStruct nested)
+            {
+                foreach (var function in EnumerateClassFunctions(nested))
+                    yield return function;
+            }
+        }
     }
 
     private static void SaveTextWithBackup(string destination, string content)
