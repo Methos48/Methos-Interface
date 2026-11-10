@@ -150,6 +150,9 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
             normalized = UnrealScriptReferenceNormalizer.RestoreEnumArguments(
                 normalized, referenceText, out int restoredEnumArguments);
             totalNormalized += restoredEnumArguments;
+            normalized = UnrealScriptCallsiteArgumentRestorer.RestoreSymbolicArguments(
+                normalized, referenceText, out int restoredCallsiteArguments);
+            totalNormalized += restoredCallsiteArguments;
         }
         if (!string.Equals(sourceText, normalized, StringComparison.Ordinal))
         {
