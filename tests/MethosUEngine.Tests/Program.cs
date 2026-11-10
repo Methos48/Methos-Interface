@@ -151,6 +151,20 @@ Assert(compiledPayload.AsSpan(6, 7).SequenceEqual(
     new byte[] { 0x04, 0x1D, 5, 0, 0, 0, 0x47 }),
     "Native compiler emitted incorrect return bytecode.");
 Assert(compiledPayload[13] == 0xCC, "Compiled function suffix data was not preserved.");
+Assert(UnrealScriptFunctionDecompiler.DecompileExport(compiledPackage, 1, 6, 7) == "return 5;",
+    "Native bytecode decompiler did not recover the compiled function source.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
+    UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return;")) == "return;",
+    "Void source/bytecode round trip failed.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
+    UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 1.5f;")) == "return 1.5f;",
+    "Float source/bytecode round trip failed.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
+    UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return \"界\";")) == "return \"界\";",
+    "Unicode source/bytecode round trip failed.");
+Assert(UnrealScriptFunctionDecompiler.DecompileReturnOnly(
+    UnrealScriptFunctionCompiler.CompileReturnOnlyBody("return 'Core';", _ => 7), _ => "Core") == "return 'Core';",
+    "Name source/bytecode round trip failed.");
 Assert(functionFixture.AsSpan(64, 9).SequenceEqual(
     new byte[] { 0xAA, 0xBB, 2, 0, 0, 0, 0x3A, 0x47, 0xCC }),
     "Native compilation modified the original package bytes.");
