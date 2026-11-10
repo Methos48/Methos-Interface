@@ -500,7 +500,7 @@ string restoredEnumCastCall = UnrealScriptCallsiteArgumentRestorer.RestoreSymbol
 Assert(restoredEnumCastCallCount == 1 &&
        restoredEnumCastCall.Contains("IsFiltered(echattype(Type), SnoopIndex)", StringComparison.Ordinal),
     "Primitive byte cast was not restored to the original enum cast in a call argument.");
-    "Numeric PlayConsoleSound arguments were not restored from the matching reference callsites.");
+
 
 string decompiledAssignmentSource = """
 class AssignmentTest;
