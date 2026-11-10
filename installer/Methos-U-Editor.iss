@@ -1,5 +1,5 @@
 #define MyAppName "Methos U Editor"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppExeName "Methos U Editor.exe"
 
 [Setup]
