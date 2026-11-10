@@ -23,6 +23,55 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Inspeccionar Compilador U.zip sin ejecutar sus binarios
+        shell: pwsh
+        run: |
+          @'
+          import hashlib, json, pathlib, re, struct, zipfile
+          candidates = [p for p in pathlib.Path(".").glob("*.zip")
+                        if "compilador" in p.name.lower() and "u" in p.name.lower()]
+          if not candidates:
+              raise SystemExit("No se encontró el ZIP Compilador U en la raíz del repositorio.")
+          report = {"archive": candidates[0].name, "archive_size": candidates[0].stat().st_size,
+                    "archive_sha256": hashlib.sha256(candidates[0].read_bytes()).hexdigest(),
+                    "entries": [], "readme_text": [], "findings": []}
+          with zipfile.ZipFile(candidates[0]) as z:
+              bad = z.testzip()
+              report["zip_integrity"] = "OK" if bad is None else f"CRC error: {bad}"
+              for info in z.infolist():
+                  item = {"name": info.filename, "size": info.file_size,
+                          "compressed_size": info.compress_size, "crc32": f"{info.CRC:08x}"}
+                  if not info.is_dir():
+                      data = z.read(info)
+                      item["sha256"] = hashlib.sha256(data).hexdigest()
+                      item["magic_hex"] = data[:16].hex(" ")
+                      ext = pathlib.PurePosixPath(info.filename).suffix.lower()
+                      if ext in (".exe", ".dll") and data[:2] == b"MZ":
+                          peoff = struct.unpack_from("<I", data, 0x3c)[0] if len(data) >= 64 else 0
+                          machine = struct.unpack_from("<H", data, peoff+4)[0] if peoff+6 <= len(data) else None
+                          item["pe_machine"] = {0x14c:"x86",0x8664:"x64",0xAA64:"ARM64"}.get(machine, hex(machine) if machine else None)
+                          strings = (re.findall(rb"[ -~]{5,}", data) +
+                                     re.findall(rb"(?:[ -~]\x00){5,}", data))
+                          joined = b" ".join(strings).decode("latin1", "ignore")
+                          terms = ["ucc", "unreal", "lineage", "compiler", "decompiler", "ue2", "package"]
+                          item["recognized_terms"] = sorted({t for t in terms if t in joined.lower()})
+                      if ext in (".txt", ".md", ".readme", ".ini", ".cfg", ".bat", ".cmd", ".ps1"):
+                          report["readme_text"].append({"name":info.filename,
+                              "text":data[:12000].decode("utf-8", "replace")})
+                  report["entries"].append(item)
+          report["findings"].append("Los ejecutables se inspeccionaron estáticamente; no se ejecutó ningún archivo del ZIP.")
+          pathlib.Path("compiler-zip-report.json").write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
+          print(json.dumps(report,indent=2,ensure_ascii=False))
+          '@ | Set-Content -Encoding utf8 inspect_compiler_zip.py
+          python inspect_compiler_zip.py
+
+      - name: Guardar informe del compilador externo
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-u-compiler-zip-analysis
+          path: compiler-zip-report.json
+          if-no-files-found: error
+
       - name: Probar motor independiente de paquetes UE2
         shell: pwsh
         run: dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- Interface.u "Carpeta interface.u.zip"
