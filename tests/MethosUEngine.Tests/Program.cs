@@ -486,6 +486,7 @@ Assert(restoredSoundCount == 4 &&
        restoredSoundCall.Contains("PlayConsoleSound(IFST_WINDOW_OPEN)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("script.SetDefaultAction(EDefaultOK)", StringComparison.Ordinal) &&
        restoredSoundCall.Contains("DialogShow(DIALOG_NumberPad, MakeFullSystemMsg(GetSystemMessage(72), Info.Name, \"\")", StringComparison.Ordinal),
+    "Nested callsite arguments were not restored from the reference.");
 
 string decompiledEnumCastCall = """
 class EnumCastCallTest;
