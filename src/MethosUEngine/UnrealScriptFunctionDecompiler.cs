@@ -126,7 +126,7 @@ public static class UnrealScriptFunctionDecompiler
                 int reference = ReadInt32(data, ref position);
                 string variable = objectResolver?.Invoke(reference)
                     ?? throw new NotSupportedException("No se proporcionó un resolvedor para variables UnrealScript.");
-                return new DecodedExpression(token == EX_DefaultVariable ? "default." + variable : variable, byte.MaxValue);
+                return new DecodedExpression(token == EX_DefaultVariable ? "default." + variable : variable, 0);
             }
             case EX_IntZero: return new DecodedExpression("0", byte.MaxValue);
             case EX_IntOne: return new DecodedExpression("1", byte.MaxValue);
@@ -175,8 +175,8 @@ public static class UnrealScriptFunctionDecompiler
                 var left = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 var right = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 ExpectEndFunctionParms(data, ref position);
-                string leftText = left.Precedence < native.Precedence ? $"({left.Text})" : left.Text;
-                string rightText = right.Precedence <= native.Precedence ? $"({right.Text})" : right.Text;
+                string leftText = left.Precedence > native.Precedence ? $"({left.Text})" : left.Text;
+                string rightText = right.Precedence >= native.Precedence ? $"({right.Text})" : right.Text;
                 result = $"{leftText} {native.Name} {rightText}";
                 break;
             }
@@ -184,7 +184,7 @@ public static class UnrealScriptFunctionDecompiler
             {
                 var operand = ReadLiteral(data, ref position, nameResolver, objectResolver, nativeResolver);
                 ExpectEndFunctionParms(data, ref position);
-                string operandText = operand.Precedence < native.Precedence ? $"({operand.Text})" : operand.Text;
+                string operandText = operand.Precedence > native.Precedence ? $"({operand.Text})" : operand.Text;
                 result = native.Name.All(char.IsLetter) ? native.Name + " " + operandText : native.Name + operandText;
                 break;
             }
@@ -216,7 +216,7 @@ public static class UnrealScriptFunctionDecompiler
                 throw new NotSupportedException($"Tipo de función nativa no admitido para 0x{token:X}.");
         }
         byte precedence = native.Kind == UnrealScriptNativeFunctionKind.Function
-            ? byte.MaxValue : native.Precedence;
+            ? (byte)0 : native.Precedence;
         return new DecodedExpression(result, precedence);
     }
 
