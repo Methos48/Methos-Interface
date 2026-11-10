@@ -187,11 +187,9 @@ jobs:
           & $env:ISCC installer\Methos-U-Editor.iss
           if ($LASTEXITCODE -ne 0) { throw "Falló Inno Setup." }
 
-      - name: Publicar ejecutable e instalador
+      - name: Publicar instalador de Windows x64
         uses: actions/upload-artifact@v4
         with:
-          name: Methos-U-Editor-Windows-x64
-          path: |
-            publish/Methos U Editor.exe
-            release/Methos-U-Editor-Setup.exe
+          name: Methos-U-Editor-Installer-Windows-x64
+          path: release/Methos-U-Editor-Setup.exe
           if-no-files-found: error
