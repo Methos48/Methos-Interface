@@ -147,7 +147,7 @@ jobs:
             ucc-validation/Compilador  U/ReferenceClasses/PartyMatchOutWaitListWnd.uc
           if-no-files-found: warn
 
-      - name: Diagnóstico no bloqueante: recompilar salida del descompilador UELib
+      - name: "Diagnóstico no bloqueante: recompilar salida del descompilador UELib"
         id: uelib_roundtrip
         continue-on-error: true
         shell: pwsh
