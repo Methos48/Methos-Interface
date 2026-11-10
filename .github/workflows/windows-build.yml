@@ -15,6 +15,25 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
+      - name: Probar lectura y descompilacion con UELib
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Ejecutar prueba de compatibilidad del paquete
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PackageProbe/PackageProbe.csproj --configuration Release -- "Interface.u" "probe-export"
+        continue-on-error: true
+
+      - name: Guardar resultado de UELib
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: methos-u-uelib-probe
+          path: probe-export/
+          if-no-files-found: ignore
+
       - name: Analizar archivos fuente
         shell: bash
         run: |
