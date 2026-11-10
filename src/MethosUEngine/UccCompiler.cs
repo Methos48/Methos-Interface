@@ -38,6 +38,10 @@ public static class UccCompiler
             throw new FileNotFoundException("No se encontró el runtime UCC de Interlude dentro de Methos U Editor.");
 
         string[] sourceFiles = Directory.GetFiles(sourceDirectory, "*.uc", SearchOption.AllDirectories)
+            .Where(path => !Path.GetRelativePath(sourceDirectory, path)
+                .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment.Equals("backups", StringComparison.OrdinalIgnoreCase)))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (sourceFiles.Length == 0)
