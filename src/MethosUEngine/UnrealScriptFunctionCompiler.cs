@@ -109,7 +109,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
-            if (c is '"' or '\'') { quote = c; continue; }
+            if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c == ';')
             {
                 string statement = source[start..i].Trim();
@@ -135,7 +135,7 @@ public static class UnrealScriptFunctionCompiler
                 if (c == quote) quote = '\0';
                 continue;
             }
-            if (c is '"' or '\'') { quote = c; continue; }
+            if (c == '"' || c == (char)39) { quote = c; continue; }
             if (c != '=') continue;
             char before = i > 0 ? statement[i - 1] : '\0';
             char after = i + 1 < statement.Length ? statement[i + 1] : '\0';
