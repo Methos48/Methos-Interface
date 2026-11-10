@@ -281,8 +281,10 @@ internal sealed class MainForm : Form
             int relative = (int)relativeLong;
             int sizeOffset = checked(export.SerialOffset + relative - 4);
             if (sizeOffset < 0 || sizeOffset > packageBytes.Length - 4) continue;
-            int scriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
-            if (scriptSize < 0 || relative > export.SerialSize - scriptSize) continue;
+            int virtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(packageBytes.AsSpan(sizeOffset, 4));
+            int scriptSize = function.ScriptSize;
+            if (scriptSize < 0 || virtualScriptSize < scriptSize ||
+                relative > export.SerialSize - scriptSize) continue;
 
             try
             {
@@ -383,12 +385,14 @@ internal sealed class MainForm : Form
                     relativeOffset > exportEntry.SerialSize - 4)
                     throw new InvalidDataException($"La posición del bytecode de '{className}.{function.Name}' no es válida.");
                 int sizeFieldOffset = checked(exportEntry.SerialOffset + (int)relativeOffset - 4);
-                int originalScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
+                int originalVirtualScriptSize = BinaryPrimitives.ReadInt32LittleEndian(
                     packageBytes.AsSpan(sizeFieldOffset, 4));
-                if (originalScriptSize < 0 || relativeOffset > exportEntry.SerialSize - originalScriptSize)
-                    throw new InvalidDataException($"El tamaño serializado del bytecode de '{className}.{function.Name}' excede el export.");
+                int originalScriptSize = function.ScriptSize;
+                if (originalScriptSize < 0 || originalVirtualScriptSize < originalScriptSize ||
+                    relativeOffset > exportEntry.SerialSize - originalScriptSize)
+                    throw new InvalidDataException($"El tamaño real/virtual del bytecode de '{className}.{function.Name}' excede el export.");
                 targets.Add(new UnrealFunctionTarget(function.Name.ToString(), exportReference,
-                    checked((int)relativeOffset), originalScriptSize));
+                    checked((int)relativeOffset), originalScriptSize, originalVirtualScriptSize));
             }
 
             var result = UnrealScriptCompilerPipeline.CompileClassSource(
