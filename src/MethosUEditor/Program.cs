@@ -165,10 +165,23 @@ internal sealed class MainForm : Form
     private static void CopyEntryWithBackup(ZipArchiveEntry entry, string destination)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination)) BackupExistingFile(destination);
-        using var input = entry.Open();
-        using var output = File.Create(destination);
-        input.CopyTo(output);
+        string temporary = Path.Combine(Path.GetDirectoryName(destination)!,
+            "." + Path.GetFileName(destination) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            using (var input = entry.Open())
+            using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                input.CopyTo(output);
+                output.Flush(flushToDisk: true);
+            }
+            if (File.Exists(destination)) BackupExistingFile(destination);
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     private void AddFolder()
@@ -529,7 +542,8 @@ internal sealed class MainForm : Form
             "Methos U Editor", "Backups", category, parentName);
         Directory.CreateDirectory(backupRoot);
         string backupName = Path.GetFileNameWithoutExtension(path) + "_" +
-            DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(path);
+            DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" +
+            Guid.NewGuid().ToString("N")[..8] + Path.GetExtension(path);
         File.Copy(path, Path.Combine(backupRoot, backupName), overwrite: true);
     }
 
@@ -708,15 +722,44 @@ internal sealed class MainForm : Form
     private static void SaveTextWithBackup(string destination, string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination)) BackupExistingFile(destination);
-        File.WriteAllText(destination, content, new UTF8Encoding(false));
+        string temporary = Path.Combine(Path.GetDirectoryName(destination)!,
+            "." + Path.GetFileName(destination) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            using (var writer = new StreamWriter(
+                new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None),
+                new UTF8Encoding(false)))
+            {
+                writer.Write(content);
+                writer.Flush();
+                writer.BaseStream.Flush(flushToDisk: true);
+            }
+            if (File.Exists(destination)) BackupExistingFile(destination);
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     private static void CopyWithBackup(string source, string destination)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        if (File.Exists(destination)) BackupExistingFile(destination);
-        File.Copy(source, destination, true);
+        string temporary = Path.Combine(Path.GetDirectoryName(destination)!,
+            "." + Path.GetFileName(destination) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            File.Copy(source, temporary, overwrite: false);
+            using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                stream.Flush(flushToDisk: true);
+            if (File.Exists(destination)) BackupExistingFile(destination);
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     private static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
