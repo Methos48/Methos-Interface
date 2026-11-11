@@ -25,8 +25,8 @@ Source: "..\README-ES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
-Name: "{userdocs}\Methos U Editor\u completo"
-Name: "{userdocs}\Methos U Editor\u por partes"
+Name: "{app}\Archivos U\Comprimido"
+Name: "{app}\Archivos U\Descomprimido"
 
 [Icons]
 Name: "{autoprograms}\Methos U Editor"; Filename: "{app}\{#MyAppExeName}"
