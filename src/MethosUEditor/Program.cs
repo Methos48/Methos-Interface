@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text;
 using UELib;
 using MethosUEngine;
@@ -35,6 +36,31 @@ internal sealed class MainForm : Form
     private readonly List<string> inputs = new();
     private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Width = 170 };
     private readonly Button compile = new() { Text = "COMPILAR", Height = 48, Width = 170 };
+    private readonly Panel xdatHostPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
+    private Panel? uViewPanel;
+    private Process? xdatProcess;
+    private IntPtr xdatWindow = IntPtr.Zero;
+    private string XdatExePath => Path.Combine(AppRoot, "XDAT", "Methos XDAT.exe");
+
+    private const int GwlStyle = -16;
+    private const long WsChild = 0x40000000L;
+    private const long WsPopup = unchecked((long)0x80000000);
+    private const long WsCaption = 0x00C00000L;
+    private const long WsThickFrame = 0x00040000L;
+    private const long WsBorder = 0x00800000L;
+    private const long WsSysMenu = 0x00080000L;
+    private const long WsMinimizeBox = 0x00020000L;
+    private const long WsMaximizeBox = 0x00010000L;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
 
     public MainForm()
     {
@@ -54,9 +80,16 @@ internal sealed class MainForm : Form
     private void BuildLayout()
     {
         var top = new Panel { Dock = DockStyle.Top, Height = 92, Padding = new Padding(18), BackColor = Color.FromArgb(32, 48, 68) };
-        var title = new Label { Text = "METHOS U EDITOR", ForeColor = Color.White, Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(18, 12) };
-        var subtitle = new Label { Text = "Editor de paquetes UnrealScript para Lineage II", ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9), AutoSize = true, Location = new Point(20, 52) };
-        top.Controls.Add(title); top.Controls.Add(subtitle);
+        var title = new Label { Text = "METHOS", ForeColor = Color.White, Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(18, 12) };
+        var subtitle = new Label { Text = "Herramientas de paquetes Lineage II Interlude", ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9), AutoSize = true, Location = new Point(20, 52) };
+        var navigation = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 310, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 14, 0, 0), BackColor = Color.Transparent };
+        var openXdatView = new Button { Text = "ARCHIVOS XDAT", Width = 140, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+        var openUView = new Button { Text = "ARCHIVOS U", Width = 130, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+        navigation.Controls.Add(openXdatView);
+        navigation.Controls.Add(openUView);
+        top.Controls.Add(title);
+        top.Controls.Add(subtitle);
+        top.Controls.Add(navigation);
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(12), BackColor = Color.White };
         var addU = new Button { Text = "Agregar .U", Width = 112, Height = 42 };
@@ -76,7 +109,27 @@ internal sealed class MainForm : Form
         right.Controls.Add(new Label { Text = "REGISTRO DE ACTIVIDAD", Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
         split.Panel2.Controls.Add(right);
 
-        Controls.Add(split); Controls.Add(status); Controls.Add(progress); Controls.Add(actions); Controls.Add(top);
+        uViewPanel = new Panel { Dock = DockStyle.Fill };
+        uViewPanel.Controls.Add(split);
+        uViewPanel.Controls.Add(status);
+        uViewPanel.Controls.Add(progress);
+        uViewPanel.Controls.Add(actions);
+
+        xdatHostPanel.Visible = false;
+        xdatHostPanel.Resize += (_, _) => ResizeXdatWindow();
+        xdatHostPanel.Controls.Add(new Label
+        {
+            Name = "xdatPlaceholder",
+            Text = "METHOS XDAT\\nPreparando el módulo XDAT...",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 15, FontStyle.Bold),
+            ForeColor = Color.FromArgb(32, 48, 68)
+        });
+
+        Controls.Add(xdatHostPanel);
+        Controls.Add(uViewPanel);
+        Controls.Add(top);
 
         addU.Click += (_, _) => AddUPackages();
         addZip.Click += (_, _) => ImportZip();
@@ -85,6 +138,114 @@ internal sealed class MainForm : Form
         openParts.Click += (_, _) => OpenFolder(PartsDir);
         decompile.Click += async (_, _) => await RunSelectedAsync(DecompileFile);
         compile.Click += async (_, _) => await RunSelectedAsync(CompileFolder);
+        openUView.Click += async (_, _) => await ShowUViewAsync();
+        openXdatView.Click += async (_, _) => await ShowXdatViewAsync();
+        FormClosed += (_, _) => StopXdatProcess();
+    }
+
+    private Task ShowUViewAsync()
+    {
+        StopXdatProcess();
+        if (xdatHostPanel is not null) xdatHostPanel.Visible = false;
+        if (uViewPanel is not null) uViewPanel.Visible = true;
+        Text = "Methos - Archivos U";
+        return Task.CompletedTask;
+    }
+
+    private async Task ShowXdatViewAsync()
+    {
+        if (uViewPanel is not null) uViewPanel.Visible = false;
+        xdatHostPanel.Visible = true;
+        Text = "Methos - Archivos XDAT";
+        if (xdatProcess is { HasExited: false } && xdatWindow != IntPtr.Zero)
+        {
+            ResizeXdatWindow();
+            return;
+        }
+
+        if (!File.Exists(XdatExePath))
+        {
+            ShowXdatHostMessage("No se encontró el módulo XDAT.\\nReinstala Methos para reparar sus componentes.");
+            return;
+        }
+
+        try
+        {
+            StopXdatProcess();
+            xdatProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = XdatExePath,
+                WorkingDirectory = Path.GetDirectoryName(XdatExePath)!,
+                UseShellExecute = false
+            });
+            if (xdatProcess is null) throw new InvalidOperationException("Windows no pudo iniciar el módulo XDAT.");
+
+            IntPtr handle = IntPtr.Zero;
+            for (int attempt = 0; attempt < 150; attempt++)
+            {
+                xdatProcess.Refresh();
+                handle = xdatProcess.MainWindowHandle;
+                if (handle != IntPtr.Zero) break;
+                if (xdatProcess.HasExited) throw new InvalidOperationException("El módulo XDAT se cerró durante el inicio.");
+                await Task.Delay(100);
+            }
+            if (handle == IntPtr.Zero)
+                throw new TimeoutException("El módulo XDAT no creó una ventana visible en 15 segundos.");
+
+            xdatWindow = handle;
+            long style = GetWindowLongPtr(xdatWindow, GwlStyle).ToInt64();
+            style &= ~(WsPopup | WsCaption | WsThickFrame | WsBorder | WsSysMenu | WsMinimizeBox | WsMaximizeBox);
+            style |= WsChild | 0x10000000L;
+            SetWindowLongPtr(xdatWindow, GwlStyle, new IntPtr(style));
+            SetParent(xdatWindow, xdatHostPanel.Handle);
+            ResizeXdatWindow();
+            xdatHostPanel.Controls.Clear();
+        }
+        catch (Exception ex)
+        {
+            StopXdatProcess();
+            ShowXdatHostMessage("No se pudo abrir el módulo XDAT.\\n\\n" + ex.Message);
+            Log("Error al iniciar el módulo XDAT: " + ex);
+        }
+    }
+
+    private void ShowXdatHostMessage(string message)
+    {
+        xdatHostPanel.Controls.Clear();
+        xdatHostPanel.Controls.Add(new Label
+        {
+            Text = message,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = Color.FromArgb(32, 48, 68)
+        });
+    }
+
+    private void ResizeXdatWindow()
+    {
+        if (xdatWindow == IntPtr.Zero || xdatHostPanel.IsDisposed) return;
+        MoveWindow(xdatWindow, 0, 0, Math.Max(1, xdatHostPanel.ClientSize.Width),
+            Math.Max(1, xdatHostPanel.ClientSize.Height), true);
+    }
+
+    private void StopXdatProcess()
+    {
+        xdatWindow = IntPtr.Zero;
+        try
+        {
+            if (xdatProcess is { HasExited: false })
+            {
+                xdatProcess.CloseMainWindow();
+                if (!xdatProcess.WaitForExit(1500)) xdatProcess.Kill(entireProcessTree: true);
+            }
+        }
+        catch { }
+        finally
+        {
+            xdatProcess?.Dispose();
+            xdatProcess = null;
+        }
     }
 
     private void RefreshInputs()
