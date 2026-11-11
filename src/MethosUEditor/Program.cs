@@ -462,7 +462,7 @@ internal sealed class MainForm : Form
                 Log(report);
                 MessageBox.Show(report, "Informe de compilación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-            else MessageBox.Show($"Revisión terminada. Todos los {selected.Count} archivos seleccionados finalizaron sin errores.", "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else MessageBox.Show($"Revisión terminada. Todos los {selected.Count} archivos seleccionados finalizaron sin errores.", "Methos", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         finally { SetBusy(false); }
     }
@@ -481,14 +481,14 @@ internal sealed class MainForm : Form
             string message = detection.DecoderAvailable
                 ? "Cifrado identificado, pero el motor de descifrado U todavía debe conectarse.\n\n" + technical
                 : "Cifrado reconocido, pero esta variante todavía no está soportada.\n\n" + technical;
-            MessageBox.Show(message, "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(message, "Methos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             Log("Proceso detenido de forma segura: el archivo cifrado no se modificó.");
             return;
         }
         if (detection.Status != "plain_candidate")
         {
             string technical = $"No se reconoce este cifrado.\n\nINFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {packageBytes.Length:N0} bytes\nEstado: {detection.Status}\nPrimeros bytes (hex): {detection.FirstBytesHex}\nDiagnóstico: {detection.Detail}\n\nEl archivo original no fue modificado.";
-            MessageBox.Show(technical, "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(technical, "Methos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         Directory.CreateDirectory(output);
