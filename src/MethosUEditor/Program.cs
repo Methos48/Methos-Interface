@@ -769,8 +769,9 @@ internal sealed class MainForm : Form
             {
                 writer.Write(content);
                 writer.Flush();
-                writer.BaseStream.Flush(flushToDisk: true);
             }
+            using (var durableStream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                durableStream.Flush(flushToDisk: true);
             if (File.Exists(destination)) BackupExistingFile(destination);
             File.Move(temporary, destination, overwrite: true);
         }
