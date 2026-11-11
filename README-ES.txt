@@ -1,10 +1,17 @@
-METHOS U EDITOR
+METHOS
 ================
 
-Herramienta de Windows para trabajar con paquetes Unreal Engine 2 de Lineage II Interlude.
+Aplicación unificada de Windows para trabajar con archivos .u y .xdat de Lineage II Interlude.
+
+INTERFAZ UNIFICADA
+Al abrir Methos verás dos botones superiores:
+- ARCHIVOS U: muestra las funciones para descompilar y compilar paquetes Unreal (.u).
+- ARCHIVOS XDAT: cambia a la vista del módulo XDAT, integrado dentro de la misma ventana principal.
+
+La barra superior identifica la vista activa. No necesitas abrir dos programas ni buscar accesos directos distintos.
 
 CARPETAS DE TRABAJO
-Dentro de la carpeta donde se instala Methos U Editor se crean:
+Dentro de la carpeta donde se instala Methos se crean:
 - Archivos U\Comprimido
   Aquí se colocan los paquetes .u que se van a descompilar o usar como base para compilar.
 - Archivos U\Descomprimido
@@ -12,7 +19,7 @@ Dentro de la carpeta donde se instala Methos U Editor se crean:
 
 Las carpetas se crean automáticamente al abrir el programa. No es necesario crear nada manualmente.
 
-El programa mantiene dos acciones principales: DESCOMPILAR y COMPILAR.
+Cada vista mantiene sus propias acciones DESCOMPILAR y COMPILAR y sus propias carpetas de trabajo.
 
 DESCOMPILAR
 1. Coloca o agrega el archivo .u en la lista.
@@ -45,3 +52,14 @@ Para otros paquetes .u, el motor nativo de Methos todavía solo admite un subcon
 
 IMPORTANTE
 Aunque las pruebas automáticas verifican la estructura del paquete y sus 169 clases, todavía se debe probar cada Interface.u recompilado en una copia de prueba del cliente antes de usarlo en el juego. Conserva siempre el Interface.u original.
+
+
+DETECCIÓN DE CIFRADO
+Methos analiza primero la cabecera de los archivos antes de enviarlos a un lector o compilador.
+- Para XDAT, reconoce 18 versiones documentadas Lineage2Ver y conecta el motor público para las 9 variantes que soporta.
+- Para U, incorpora un detector de la misma familia de cabeceras y reconoce la firma de paquetes Unreal UE1/UE2 sin cifrar.
+- Una versión identificada no significa que todas las claves o protecciones privadas sean compatibles.
+- Si no reconoce el cifrado, muestra primero «No se reconoce este cifrado» y después los datos técnicos. El original se conserva.
+- En U, la detección está integrada; el descifrado automático de paquetes U es una fase separada que todavía debe conectarse y probarse.
+
+La vista XDAT se ejecuta integrada en la ventana principal de Methos. El instalador incluye sus componentes y el motor de cifrado necesario.
