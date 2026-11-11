@@ -4,10 +4,13 @@ METHOS U EDITOR
 Herramienta de Windows para trabajar con paquetes Unreal Engine 2 de Lineage II Interlude.
 
 CARPETAS DE TRABAJO
-- Documentos\Methos U Editor\u completo
-  Aquí se guardan los paquetes compilados (.u).
-- Documentos\Methos U Editor\u por partes
-  Aquí se guardan las fuentes (.uc), dentro de una carpeta por paquete.
+Dentro de la carpeta donde se instala Methos U Editor se crean:
+- Archivos U\Comprimido
+  Aquí se colocan los paquetes .u que se van a descompilar o usar como base para compilar.
+- Archivos U\Descomprimido
+  Aquí aparecen las fuentes .uc extraídas y se editan las clases para volver a compilar.
+
+Las carpetas se crean automáticamente al abrir el programa. No es necesario crear nada manualmente.
 
 El programa mantiene dos acciones principales: DESCOMPILAR y COMPILAR.
 
@@ -15,13 +18,13 @@ DESCOMPILAR
 1. Coloca o agrega el archivo .u en la lista.
 2. Selecciona el paquete.
 3. Pulsa DESCOMPILAR.
-4. Las fuentes .uc aparecen en la carpeta del paquete dentro de "u por partes".
+4. Las fuentes .uc aparecen en la carpeta del paquete dentro de "Archivos U\\Descomprimido".
 
 Para el Interface.u original de Interlude incluido en este proyecto, Methos U reconoce el SHA-256 de la referencia y recupera las 169 fuentes originales verificadas incluidas con el kit Compilador U. Si el paquete fue compilado previamente por Methos U, recupera la copia exacta de fuentes guardada en la caché local.
 Para otros paquetes o versiones que no tengan una fuente de referencia, utiliza UELib como lector de compatibilidad. La salida de ese lector puede contener expresiones nativas que no se pueden reconstruir como UnrealScript original.
 
 COMPILAR
-1. Selecciona el paquete .u en "u completo".
+1. Selecciona el paquete .u en "Archivos U\\Comprimido".
 2. Comprueba que sus fuentes .uc estén en la carpeta correspondiente dentro de "u por partes".
 3. Pulsa COMPILAR.
 4. El programa valida el resultado y solo entonces reemplaza el paquete de destino.
