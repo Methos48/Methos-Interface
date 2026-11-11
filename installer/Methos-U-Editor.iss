@@ -27,6 +27,8 @@ Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 [Dirs]
 Name: "{app}\Archivos U\Comprimido"
 Name: "{app}\Archivos U\Descomprimido"
+Name: "{app}\Archivos XDAT\Comprimido"
+Name: "{app}\Archivos XDAT\Descomprimido"
 
 [Icons]
 Name: "{autoprograms}\Methos U Editor"; Filename: "{app}\{#MyAppExeName}"
