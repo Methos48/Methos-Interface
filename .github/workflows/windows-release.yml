@@ -197,8 +197,10 @@ jobs:
           if ((Get-Item $setup).Length -lt 1MB) { throw "El instalador parece incompleto o demasiado pequeño." }
 
           $installDir = Join-Path $env:RUNNER_TEMP "Methos U Editor Smoke Test"
-          $install = Start-Process -FilePath $setup -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$installDir") -Wait -PassThru
+          $installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR=`"$installDir`""
+          $install = Start-Process -FilePath $setup -ArgumentList $installArgs -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "La instalación silenciosa falló con código $($install.ExitCode)." }
+          Write-Host "Instalación de prueba en: $installDir"
 
           $app = Join-Path $installDir "Methos U Editor.exe"
           $ucc = Join-Path $installDir "UccRuntime\Interlude\System\ucc.exe"
@@ -207,6 +209,10 @@ jobs:
           if (!(Test-Path $ucc)) { throw "El instalador no incluyó UCC." }
           $classes = (Get-ChildItem -LiteralPath $reference -File -Filter "*.uc").Count
           if ($classes -lt 150) { throw "El runtime instalado solo contiene $classes clases de referencia." }
+          $documents = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Methos U Editor"
+          foreach ($folder in @("u completo", "u por partes")) {
+            if (!(Test-Path (Join-Path $documents $folder))) { throw "No se creó la carpeta de trabajo '$folder'." }
+          }
 
           $process = Start-Process -FilePath $app -PassThru
           Start-Sleep -Seconds 8
