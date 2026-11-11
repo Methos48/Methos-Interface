@@ -226,7 +226,7 @@ jobs:
           if (!$xdatExe) { throw "La compilación XDAT terminó sin generar Methos XDAT.exe." }
           $target = Join-Path $env:GITHUB_WORKSPACE "publish\\XDAT"
           New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item $xdatExe.Directory.FullName\\* $target -Recurse -Force
+          Copy-Item "$($xdatExe.Directory.FullName)\\*" -Destination $target -Recurse -Force
           Write-Host "Módulo XDAT integrado en publish\\XDAT: $($xdatExe.FullName)"
 
       - name: Instalar Inno Setup
