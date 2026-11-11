@@ -626,8 +626,8 @@ internal sealed class MainForm : Form
         string metadataPath = PackageOriginMetadata.Save(
             path, packageBytes, output, "UnrealPackage",
             detection.Status.ToString(), detection.Family, detection.Version,
-            detection.Header, detection.Detail, package.Summary.Version,
-            package.Summary.LicenseeVersion);
+            detection.Header, detection.Detail, checked((int)package.Summary.Version),
+            checked((int)package.Summary.LicenseeVersion));
         Log($"Perfil de origen guardado: {metadataPath}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
     });
 
