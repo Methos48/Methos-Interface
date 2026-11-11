@@ -29,6 +29,8 @@ foreach (int protocol in new[] { 121, 821 })
     var filenameDependent = Lineage2FileDetector.Detect(EncryptionHeader(protocol));
     Assert(filenameDependent.FilenameRequired,
         $"Protocol {protocol} must retain the original filename for decoding.");
+    Assert(filenameDependent.Detail.Contains("nombre original", StringComparison.OrdinalIgnoreCase),
+        $"Protocol {protocol} must explain that the original filename is required.");
 }
 var malformedProtocol = Lineage2FileDetector.Detect(System.Text.Encoding.Unicode.GetBytes("Lineage2VerABC"));
 Assert(malformedProtocol.Status == "malformed_header", "Malformed encryption header was accepted.");
