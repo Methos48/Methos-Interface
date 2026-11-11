@@ -194,14 +194,14 @@ if (args.Length >= 4 && args[0] == "--normalize-sources")
         normalized = UnrealScriptDecompilerDiagnosticCleaner.RemoveOrphanedSwitchDiagnostics(
             normalized, out int removedSwitchDiagnostics);
         totalSwitchDiagnosticsRemoved += removedSwitchDiagnostics;
-        string className = Path.GetFileNameWithoutExtension(sourcePath);
-        if (className.Equals("AutoBuffWnd", StringComparison.OrdinalIgnoreCase) ||
-            className.Equals("AutoPotionsWnd", StringComparison.OrdinalIgnoreCase) ||
-            className.Equals("AutoSkillWnd", StringComparison.OrdinalIgnoreCase))
+        string diagnosticClassName = Path.GetFileNameWithoutExtension(sourcePath);
+        if (diagnosticClassName.Equals("AutoBuffWnd", StringComparison.OrdinalIgnoreCase) ||
+            diagnosticClassName.Equals("AutoPotionsWnd", StringComparison.OrdinalIgnoreCase) ||
+            diagnosticClassName.Equals("AutoSkillWnd", StringComparison.OrdinalIgnoreCase))
         {
             if (normalized.Contains("Failed to format", StringComparison.OrdinalIgnoreCase))
-                throw new Exception($"UELib switch diagnostics remain in {className}.uc after cleanup.");
-            Console.WriteLine($"{className} SWITCH FORMAT DIAGNOSTICS REMOVED: {removedSwitchDiagnostics}.");
+                throw new Exception($"UELib switch diagnostics remain in {diagnosticClassName}.uc after cleanup.");
+            Console.WriteLine($"{diagnosticClassName} SWITCH FORMAT DIAGNOSTICS REMOVED: {removedSwitchDiagnostics}.");
         }
         if (!string.Equals(sourceText, normalized, StringComparison.Ordinal))
         {
