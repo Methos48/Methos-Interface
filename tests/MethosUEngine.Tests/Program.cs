@@ -10,6 +10,32 @@ static void Assert(bool condition, string message)
     if (!condition) throw new Exception(message);
 }
 
+static byte[] EncryptionHeader(int version)
+{
+    return System.Text.Encoding.Unicode.GetBytes($"Lineage2Ver{version:D3}");
+}
+
+foreach (int protocol in new[] { 111, 120, 121, 211, 212, 411, 412, 413, 414, 611, 612, 613, 614, 811, 820, 821, 911, 912 })
+{
+    var detected = Lineage2FileDetector.Detect(EncryptionHeader(protocol));
+    Assert(detected.Encrypted == true && detected.Version == protocol,
+        $"Encryption detector failed for Lineage2Ver{protocol:D3}.");
+}
+var unknownProtocol = Lineage2FileDetector.Detect(EncryptionHeader(999));
+Assert(unknownProtocol.Status == "unsupported_version" && unknownProtocol.Encrypted == true,
+    "Unknown Lineage II protocol was not reported as an unsupported encrypted file.");
+var malformedProtocol = Lineage2FileDetector.Detect(System.Text.Encoding.Unicode.GetBytes("Lineage2VerABC"));
+Assert(malformedProtocol.Status == "malformed_header", "Malformed encryption header was accepted.");
+byte[] unrealHeader = new byte[36];
+BinaryPrimitives.WriteUInt32LittleEndian(unrealHeader, UnrealPackageIndex.PackageTag);
+BinaryPrimitives.WriteUInt16LittleEndian(unrealHeader.AsSpan(4), 123);
+var plainPackage = Lineage2FileDetector.Detect(unrealHeader);
+Assert(plainPackage.Status == "plain_candidate" && plainPackage.Family == "UNREAL",
+    "Valid Unreal package signature was not recognized.");
+var unknownFile = Lineage2FileDetector.Detect(new byte[] { 0xFF, 0xED, 0xFA, 0xCE, 0x01 });
+Assert(unknownFile.Status == "unknown_or_truncated" && unknownFile.Encrypted is null,
+    "Unknown file signature was incorrectly classified as plaintext or encrypted.");
+
 static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
 {
     owner.Load();
