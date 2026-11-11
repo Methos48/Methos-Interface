@@ -62,7 +62,7 @@ public static class Lineage2FileDetector
         }
 
         return new("unknown_or_truncated", null, null, "UNKNOWN", false, false, null, signature,
-            "No se reconoce la cabecera de cifrado ni la firma de paquete Unreal.");
+            "Firma no reconocida: podría ser cifrado u ofuscación personalizada, corrupción, archivo truncado o una variante distinta. No se asignó un protocolo por suposición.");
     }
 }
 
