@@ -276,6 +276,13 @@ jobs:
           $xdatEngine = Join-Path $installDir "XDAT\\l2encdec.exe"
           if (!(Test-Path $xdatEngine)) { throw "El instalador no incluyó el motor de cifrado XDAT." }
 
+          $xdatProcess = Start-Process -FilePath $xdatExe -WorkingDirectory (Split-Path $xdatExe) -PassThru
+          Start-Sleep -Seconds 8
+          $xdatProcess.Refresh()
+          if ($xdatProcess.HasExited) { throw "El módulo XDAT se cerró durante la prueba de arranque (código $($xdatProcess.ExitCode))." }
+          Stop-Process -Id $xdatProcess.Id -Force
+          Write-Host "SMOKE TEST XDAT OK: ejecutable y motor integrados."
+
           $workRoot = Join-Path $installDir "Archivos U"
           foreach ($folder in @("Comprimido", "Descomprimido")) {
             if (!(Test-Path (Join-Path $workRoot $folder))) { throw "No se creó la carpeta de trabajo '$folder' dentro de Archivos U." }
