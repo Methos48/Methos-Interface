@@ -36,7 +36,9 @@ internal sealed class MainForm : Form
     private readonly ProgressBar progress = new() { Dock = DockStyle.Bottom, Height = 18 };
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 24, Text = "Listo", TextAlign = ContentAlignment.MiddleLeft };
     private readonly List<string> inputs = new();
-    private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Width = 170 };
+    private readonly Button loadOriginal = new() { Text = "CARGAR ARCHIVO", Height = 48, Width = 150 };
+    private readonly Button loadSources = new() { Text = "CARGAR ARCHIVOS DESCOMPILADOS", Height = 48, Width = 235 };
+    private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Width = 140 };
     private readonly Button compile = new() { Text = "COMPILAR", Height = 48, Width = 170 };
     private readonly Panel xdatHostPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
     private Panel? uViewPanel;
@@ -96,12 +98,10 @@ internal sealed class MainForm : Form
         top.Controls.Add(navigation);
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(12), BackColor = Color.White };
-        var addU = new Button { Text = "Agregar .U", Width = 112, Height = 42 };
-        var addZip = new Button { Text = "Importar ZIP", Width = 112, Height = 42 };
-        var addFolder = new Button { Text = "Agregar carpeta", Width = 130, Height = 42 };
+        
         var openComplete = new Button { Text = "Abrir Comprimido", Width = 145, Height = 42 };
         var openParts = new Button { Text = "Abrir Descomprimido", Width = 155, Height = 42 };
-        actions.Controls.AddRange(new Control[] { addU, addZip, addFolder, decompile, compile, openComplete, openParts });
+        actions.Controls.AddRange(new Control[] { loadOriginal, decompile, loadSources, compile, openComplete, openParts });
 
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 430, Padding = new Padding(10) };
         var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
@@ -135,9 +135,8 @@ internal sealed class MainForm : Form
         Controls.Add(uViewPanel);
         Controls.Add(top);
 
-        addU.Click += (_, _) => AddUPackages();
-        addZip.Click += (_, _) => ImportZip();
-        addFolder.Click += (_, _) => AddFolder();
+        loadOriginal.Click += (_, _) => AddUPackages();
+        loadSources.Click += (_, _) => ImportSourcesForSelectedPackage();
         openComplete.Click += (_, _) => OpenFolder(CompleteDir);
         openParts.Click += (_, _) => OpenFolder(PartsDir);
         decompile.Click += async (_, _) => await RunSelectedAsync(DecompileFile);
@@ -281,6 +280,32 @@ internal sealed class MainForm : Form
             if (!SamePath(src, dst)) CopyWithBackup(src, dst);
         }
         RefreshInputs();
+    }
+
+    private void ImportSourcesForSelectedPackage()
+    {
+        if (files.SelectedIndices.Count != 1)
+        {
+            MessageBox.Show("Selecciona un único paquete .u antes de cargar sus fuentes.");
+            return;
+        }
+        int index = files.SelectedIndices[0];
+        if (index < 0 || index >= inputs.Count) return;
+        string packageName = Path.GetFileNameWithoutExtension(inputs[index]);
+        using var dialog = new FolderBrowserDialog { Description = "Selecciona la carpeta externa que contiene las fuentes modificadas (.uc)." };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        try
+        {
+            string destination = Path.Combine(PartsDir, packageName);
+            int count = WorkspaceImport.ReplaceSources(dialog.SelectedPath, destination);
+            Log($"Fuentes importadas de forma segura: {count} archivos .uc para {packageName}. Se conservaron los metadatos .methos.");
+            MessageBox.Show($"Se importaron {count} fuentes para {packageName}.", "Methos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            Log("Importación cancelada: " + ex.Message);
+            MessageBox.Show(ex.Message, "No se reemplazaron las fuentes", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void ImportZip()
@@ -805,7 +830,10 @@ internal sealed class MainForm : Form
         string originManifest = Path.Combine(sourceDirectory, ".methos", "origin.json");
         if (File.Exists(originManifest))
         {
-            using var origin = PackageOriginMetadata.TryLoadAndValidate(originManifest, packagePath)
+            string immutableOriginal = Path.Combine(Path.GetDirectoryName(originManifest)!, "originals", Path.GetFileName(packagePath));
+            if (!File.Exists(immutableOriginal))
+                throw new FileNotFoundException("Falta la copia original inmutable necesaria para validar el perfil Methos.", immutableOriginal);
+            using var origin = PackageOriginMetadata.TryLoadAndValidate(originManifest, immutableOriginal)
                 ?? throw new InvalidDataException("No se pudo leer el perfil de origen Methos.");
             var encoding = origin.RootElement.GetProperty("encoding");
             int? recordedProtocol = encoding.TryGetProperty("protocol_version", out var protocolValue) &&
