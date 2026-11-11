@@ -247,7 +247,7 @@ jobs:
           & $env:ISCC installer\Methos-U-Editor.iss
           if ($LASTEXITCODE -ne 0) { throw "Falló Inno Setup." }
 
-      - name: Probar instalación silenciosa y arranque de Methos U Editor
+      - name: Probar instalación silenciosa y arranque de Methos
         shell: pwsh
         run: |
           $setup = Join-Path $PWD "release\Methos-Setup.exe"
