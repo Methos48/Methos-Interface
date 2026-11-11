@@ -443,9 +443,12 @@ internal sealed class MainForm : Form
             status.Text = failures.Count == 0 ? "Proceso finalizado" : $"Finalizado con {failures.Count} archivo(s) con errores";
             if (failures.Count > 0)
             {
-                string report = "Revisión completa. Se procesaron todos los archivos seleccionados.\n\n" +
-                    $"Archivos revisados: {selected.Count}\nArchivos con errores: {failures.Count}\n\n" +
-                    string.Join("\n\n", failures);
+                string report = "PROCESO FALLIDO\n\nArchivos con errores:\n- " +
+                    string.Join("\n- ", failures.Select(item =>
+                    {
+                        int separator = item.IndexOf(": ", StringComparison.Ordinal);
+                        return separator < 0 ? item : item[..separator] + "\n  Motivo: " + item[(separator + 2)..];
+                    }));
                 Log(report);
                 MessageBox.Show(report, "Informe de compilación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
