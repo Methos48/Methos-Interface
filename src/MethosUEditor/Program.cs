@@ -436,11 +436,11 @@ internal sealed class MainForm : Form
                 {
                     string name = Path.GetFileName(selected[i]);
                     string detail = ex.GetBaseException().Message;
-                    const string sourceFailureMarker = "METHOS_SOURCE_FAILURES\\n";
+                    const string sourceFailureMarker = "METHOS_SOURCE_FAILURES\n";
                     if (detail.StartsWith(sourceFailureMarker, StringComparison.Ordinal))
                     {
                         failures.AddRange(detail[sourceFailureMarker.Length..]
-                            .Split(new[] { '\\r', '\\n' }, StringSplitOptions.RemoveEmptyEntries));
+                            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
                     }
                     else
                     {
@@ -899,7 +899,7 @@ internal sealed class MainForm : Form
                 }
             }
             if (preflightFailures.Count > 0)
-                throw new InvalidDataException("METHOS_SOURCE_FAILURES\\n" + string.Join("\\n", preflightFailures));
+                throw new InvalidDataException("METHOS_SOURCE_FAILURES\n" + string.Join("\n", preflightFailures));
             Log($"Revisión previa correcta: {ucFiles.Length} fuentes .uc. Iniciando UCC.");
             UccCompileResult uccResult = UccCompiler.CompileInterface(UccRuntimeRoot, sourceDirectory);
             string uccTemporaryOutput = Path.Combine(Path.GetTempPath(), "MethosU_UCC_" + Guid.NewGuid().ToString("N") + ".u");
@@ -1007,7 +1007,7 @@ internal sealed class MainForm : Form
         }
 
         if (sourceFailures.Count > 0)
-            throw new InvalidDataException("METHOS_SOURCE_FAILURES\\n" + string.Join("\\n", sourceFailures));
+            throw new InvalidDataException("METHOS_SOURCE_FAILURES\n" + string.Join("\n", sourceFailures));
         if (classesProcessed == 0 || functionsCompiled == 0)
             throw new NotSupportedException("El motor nativo todavía no encontró funciones compatibles para compilar. No se reemplazó el .u. Actualmente admite un subconjunto de cuerpos return con literales; el soporte general de UnrealScript sigue en desarrollo.");
 
