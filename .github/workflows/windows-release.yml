@@ -178,6 +178,8 @@ jobs:
         run: |
           git clone --branch research/xdat-format-probe --depth 1 https://github.com/Methos48/Methos-XDAT.git "$env:GITHUB_WORKSPACE\\xdat-source"
           if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar el proyecto Methos XDAT." }
+          $xdatCommit = (git -C "$env:GITHUB_WORKSPACE\\xdat-source" rev-parse HEAD).Trim()
+          Write-Host "Commit XDAT integrado en Methos: $xdatCommit"
 
       - name: Instalar Python 3.12 para el módulo XDAT
         uses: actions/setup-python@v5
