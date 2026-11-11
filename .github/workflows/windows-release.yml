@@ -173,6 +173,62 @@ jobs:
           if ($classCount -lt 150) { throw "Solo se incluyeron $classCount fuentes .uc de referencia." }
           Write-Host "Runtime UCC incluido; fuentes originales de Interface: $classCount clases."
 
+      - name: Descargar el módulo XDAT desde su rama de integración
+        shell: pwsh
+        run: |
+          git clone --branch research/xdat-format-probe --depth 1 https://github.com/Methos48/Methos-XDAT.git "$env:GITHUB_WORKSPACE\\xdat-source"
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo descargar el proyecto Methos XDAT." }
+
+      - name: Instalar Python 3.12 para el módulo XDAT
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Compilar y probar el módulo XDAT
+        shell: pwsh
+        run: |
+          $xdatRepo = Join-Path $env:GITHUB_WORKSPACE "xdat-source"
+          $zip = Join-Path $xdatRepo "Methos_XDAT_Windows_Build_Kit_v1.0 (1).zip"
+          if (!(Test-Path $zip)) { throw "No se encontró el kit fuente de Methos XDAT." }
+          $extract = Join-Path $env:RUNNER_TEMP "methos-xdat-kit"
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+          $project = Get-ChildItem $extract -Directory | Select-Object -First 1
+          if (!$project) { throw "El kit XDAT no contiene la carpeta del proyecto." }
+
+          python "$xdatRepo\\apply_detection_layer.py" "$($project.FullName)"
+          if ($LASTEXITCODE -ne 0) { throw "Falló la capa de detección XDAT." }
+          python "$xdatRepo\\auto_pipeline_overlay.py" "$($project.FullName)"
+          if ($LASTEXITCODE -ne 0) { throw "Falló la integración del pipeline XDAT." }
+
+          $cryptoZip = Join-Path $env:RUNNER_TEMP "l2encdec-win32.zip"
+          Invoke-WebRequest -Uri "https://github.com/ritsuwastaken/open-l2encdec/releases/download/1.5.1/l2encdec-1.5.1-win32.zip" -OutFile $cryptoZip
+          $cryptoDir = Join-Path $env:RUNNER_TEMP "methos-xdat-crypto"
+          Expand-Archive -LiteralPath $cryptoZip -DestinationPath $cryptoDir -Force
+          $engine = Get-ChildItem $cryptoDir -Recurse -File | Where-Object { $_.Name -ieq "l2encdec.exe" } | Select-Object -First 1
+          if (!$engine) { throw "No se encontró el motor l2encdec.exe." }
+          Copy-Item $engine.FullName (Join-Path $project.FullName "l2encdec.exe") -Force
+
+          python -m pip install --upgrade pip
+          python -m pip install -r (Join-Path $project.FullName "requirements-build.txt")
+          Push-Location $project.FullName
+          try {
+            python -m py_compile app.py xdat_core.py encryption_detection.py auto_pipeline.py
+            if ($LASTEXITCODE -ne 0) { throw "Falló la verificación de sintaxis XDAT." }
+            python -m unittest discover -s tests -v
+            if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas XDAT." }
+            cmd /c build_windows.bat
+            if ($LASTEXITCODE -ne 0) { throw "Falló la compilación Windows del módulo XDAT." }
+          }
+          finally { Pop-Location }
+
+          $xdatExe = Get-ChildItem (Join-Path $project.FullName "dist") -Recurse -File -Filter "Methos XDAT.exe" | Select-Object -First 1
+          if (!$xdatExe) { throw "La compilación XDAT terminó sin generar Methos XDAT.exe." }
+          $target = Join-Path $env:GITHUB_WORKSPACE "publish\\XDAT"
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item $xdatExe.Directory.FullName\\* $target -Recurse -Force
+          Write-Host "Módulo XDAT integrado en publish\\XDAT: $($xdatExe.FullName)"
+
       - name: Instalar Inno Setup
         shell: pwsh
         run: |
@@ -215,6 +271,11 @@ jobs:
           foreach ($requiredClass in @("UICommonAPI.uc", "AutoBuffWnd.uc", "AutoPotionsWnd.uc", "AutoSkillWnd.uc")) {
             if (!(Test-Path (Join-Path $reference $requiredClass))) { throw "Falta la fuente de referencia requerida: $requiredClass." }
           }
+          $xdatExe = Join-Path $installDir "XDAT\\Methos XDAT.exe"
+          if (!(Test-Path $xdatExe)) { throw "El instalador no incluyó el módulo XDAT." }
+          $xdatEngine = Join-Path $installDir "XDAT\\l2encdec.exe"
+          if (!(Test-Path $xdatEngine)) { throw "El instalador no incluyó el motor de cifrado XDAT." }
+
           $workRoot = Join-Path $installDir "Archivos U"
           foreach ($folder in @("Comprimido", "Descomprimido")) {
             if (!(Test-Path (Join-Path $workRoot $folder))) { throw "No se creó la carpeta de trabajo '$folder' dentro de Archivos U." }
