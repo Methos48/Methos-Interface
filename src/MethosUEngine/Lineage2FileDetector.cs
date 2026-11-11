@@ -46,9 +46,10 @@ public static class Lineage2FileDetector
                         "Cifrado Lineage II reconocido, pero esta versión no está catalogada.");
                 return new("recognized_encryption", true, version, protocol.Family,
                     protocol.NeedsFilename, protocol.EngineAvailable, header, signature,
-                    protocol.EngineAvailable
+                    (protocol.EngineAvailable
                         ? "Protocolo identificado; todavía debe descifrarse y validarse el paquete."
-                        : "Variante LameCrypt identificada; falta integrar un motor compatible.");
+                        : "Variante LameCrypt identificada; falta integrar un motor compatible.")
+                    + (protocol.NeedsFilename ? " Este protocolo requiere conservar el nombre original del archivo." : ""));
             }
         }
 
