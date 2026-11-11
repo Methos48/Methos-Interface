@@ -25,7 +25,7 @@ Para otros paquetes o versiones que no tengan una fuente de referencia, utiliza 
 
 COMPILAR
 1. Selecciona el paquete .u en "Archivos U\\Comprimido".
-2. Comprueba que sus fuentes .uc estén en la carpeta correspondiente dentro de "u por partes".
+2. Comprueba que sus fuentes .uc estén en la carpeta correspondiente dentro de "Archivos U\\Descomprimido".
 3. Pulsa COMPILAR.
 4. El programa valida el resultado y solo entonces reemplaza el paquete de destino.
 
