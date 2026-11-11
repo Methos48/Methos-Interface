@@ -215,9 +215,9 @@ jobs:
           foreach ($requiredClass in @("UICommonAPI.uc", "AutoBuffWnd.uc", "AutoPotionsWnd.uc", "AutoSkillWnd.uc")) {
             if (!(Test-Path (Join-Path $reference $requiredClass))) { throw "Falta la fuente de referencia requerida: $requiredClass." }
           }
-          $documents = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Methos U Editor"
-          foreach ($folder in @("u completo", "u por partes")) {
-            if (!(Test-Path (Join-Path $documents $folder))) { throw "No se creó la carpeta de trabajo '$folder'." }
+          $workRoot = Join-Path $installDir "Archivos U"
+          foreach ($folder in @("Comprimido", "Descomprimido")) {
+            if (!(Test-Path (Join-Path $workRoot $folder))) { throw "No se creó la carpeta de trabajo '$folder' dentro de Archivos U." }
           }
 
           $process = Start-Process -FilePath $app -PassThru
