@@ -440,7 +440,6 @@ internal sealed class MainForm : Form
             // UELib remains the compatibility reader while the native compiler is developed.
             Log($"Aviso del analizador independiente: {ex.Message}");
         }
-        byte[] packageBytes = File.ReadAllBytes(path);
         if (TryRestoreExactSources(baseName, packageBytes, output))
             return;
 
