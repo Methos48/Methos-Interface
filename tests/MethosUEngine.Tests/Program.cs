@@ -43,6 +43,8 @@ Assert(plainPackage.Status == "plain_candidate" && plainPackage.Family == "UNREA
 var unknownFile = Lineage2FileDetector.Detect(new byte[] { 0xFF, 0xED, 0xFA, 0xCE, 0x01 });
 Assert(unknownFile.Status == "unknown_or_truncated" && unknownFile.Encrypted is null,
     "Unknown file signature was incorrectly classified as plaintext or encrypted.");
+Assert(unknownFile.Detail.Contains("ofuscación personalizada", StringComparison.OrdinalIgnoreCase),
+    "Unknown U signature must explain that custom encryption is possible without claiming it.");
 byte[] userXdatSignature = Convert.FromHexString("FFEDFACE0100FE0FC39D0109E1BB1ADF")
     .Concat(new byte[100]).ToArray();
 var unknownXdat = Lineage2FileDetector.Detect(userXdatSignature);
