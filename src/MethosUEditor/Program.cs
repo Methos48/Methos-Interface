@@ -66,7 +66,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Methos U Editor";
+        Text = "Methos - Archivos U";
         Width = 980; Height = 700; MinimumSize = new Size(820, 560);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(245, 247, 250);
@@ -87,8 +87,8 @@ internal sealed class MainForm : Form
         var title = new Label { Text = "METHOS", ForeColor = Color.White, Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(18, 12) };
         var subtitle = new Label { Text = "Herramientas de paquetes Lineage II Interlude", ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9), AutoSize = true, Location = new Point(20, 52) };
         var navigation = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 310, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 14, 0, 0), BackColor = Color.Transparent };
-        var openXdatView = new Button { Text = "ARCHIVOS XDAT", Width = 140, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
-        var openUView = new Button { Text = "ARCHIVOS U", Width = 130, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+        var openXdatView = new Button { Text = "ARCHIVOS XDAT", Width = 140, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.White };
+        var openUView = new Button { Text = "ARCHIVOS U", Width = 130, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.LightSteelBlue };
         navigation.Controls.Add(openXdatView);
         navigation.Controls.Add(openUView);
         top.Controls.Add(title);
@@ -142,8 +142,18 @@ internal sealed class MainForm : Form
         openParts.Click += (_, _) => OpenFolder(PartsDir);
         decompile.Click += async (_, _) => await RunSelectedAsync(DecompileFile);
         compile.Click += async (_, _) => await RunSelectedAsync(CompileFolder);
-        openUView.Click += async (_, _) => await ShowUViewAsync();
-        openXdatView.Click += async (_, _) => await ShowXdatViewAsync();
+        openUView.Click += async (_, _) =>
+        {
+            openUView.BackColor = Color.LightSteelBlue;
+            openXdatView.BackColor = Color.White;
+            await ShowUViewAsync();
+        };
+        openXdatView.Click += async (_, _) =>
+        {
+            openXdatView.BackColor = Color.LightSteelBlue;
+            openUView.BackColor = Color.White;
+            await ShowXdatViewAsync();
+        };
         FormClosed += (_, _) => StopXdatProcess();
     }
 
