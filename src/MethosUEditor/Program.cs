@@ -120,7 +120,7 @@ internal sealed class MainForm : Form
         xdatHostPanel.Controls.Add(new Label
         {
             Name = "xdatPlaceholder",
-            Text = "METHOS XDAT\\nPreparando el módulo XDAT...",
+            Text = "METHOS XDAT\nPreparando el módulo XDAT...",
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = new Font("Segoe UI", 15, FontStyle.Bold),
@@ -165,7 +165,7 @@ internal sealed class MainForm : Form
 
         if (!File.Exists(XdatExePath))
         {
-            ShowXdatHostMessage("No se encontró el módulo XDAT.\\nReinstala Methos para reparar sus componentes.");
+            ShowXdatHostMessage("No se encontró el módulo XDAT.\nReinstala Methos para reparar sus componentes.");
             return;
         }
 
@@ -204,7 +204,7 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             StopXdatProcess();
-            ShowXdatHostMessage("No se pudo abrir el módulo XDAT.\\n\\n" + ex.Message);
+            ShowXdatHostMessage("No se pudo abrir el módulo XDAT.\n\n" + ex.Message);
             Log("Error al iniciar el módulo XDAT: " + ex);
         }
     }
@@ -410,17 +410,17 @@ internal sealed class MainForm : Form
         Log($"Detección U: estado={detection.Status}; familia={detection.Family}; versión={detection.Version?.ToString() ?? "(ninguna)"}.");
         if (detection.Encrypted == true)
         {
-            string technical = $"INFORMACIÓN TÉCNICA\\nArchivo: {Path.GetFileName(path)}\\nTamaño: {packageBytes.Length:N0} bytes\\nEstado: {detection.Status}\\nVersión: {detection.Version}\\nFamilia: {detection.Family}\\nCabecera: {detection.Header ?? "(no identificada)"}\\nPrimeros bytes (hex): {detection.FirstBytesHex}\\nDiagnóstico: {detection.Detail}\\n\\nEl archivo original no fue modificado.";
+            string technical = $"INFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {packageBytes.Length:N0} bytes\nEstado: {detection.Status}\nVersión: {detection.Version}\nFamilia: {detection.Family}\nCabecera: {detection.Header ?? "(no identificada)"}\nPrimeros bytes (hex): {detection.FirstBytesHex}\nDiagnóstico: {detection.Detail}\n\nEl archivo original no fue modificado.";
             string message = detection.DecoderAvailable
-                ? "Cifrado identificado, pero el motor de descifrado U todavía debe conectarse.\\n\\n" + technical
-                : "Cifrado reconocido, pero esta variante todavía no está soportada.\\n\\n" + technical;
+                ? "Cifrado identificado, pero el motor de descifrado U todavía debe conectarse.\n\n" + technical
+                : "Cifrado reconocido, pero esta variante todavía no está soportada.\n\n" + technical;
             MessageBox.Show(message, "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             Log("Proceso detenido de forma segura: el archivo cifrado no se modificó.");
             return;
         }
         if (detection.Status != "plain_candidate")
         {
-            string technical = $"No se reconoce este cifrado.\\n\\nINFORMACIÓN TÉCNICA\\nArchivo: {Path.GetFileName(path)}\\nTamaño: {packageBytes.Length:N0} bytes\\nEstado: {detection.Status}\\nPrimeros bytes (hex): {detection.FirstBytesHex}\\nDiagnóstico: {detection.Detail}\\n\\nEl archivo original no fue modificado.";
+            string technical = $"No se reconoce este cifrado.\n\nINFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {packageBytes.Length:N0} bytes\nEstado: {detection.Status}\nPrimeros bytes (hex): {detection.FirstBytesHex}\nDiagnóstico: {detection.Detail}\n\nEl archivo original no fue modificado.";
             MessageBox.Show(technical, "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
