@@ -802,6 +802,20 @@ internal sealed class MainForm : Form
             else throw new DirectoryNotFoundException($"No existe la carpeta de fuentes: {sourceDirectory}");
         }
 
+        string originManifest = Path.Combine(sourceDirectory, ".methos", "origin.json");
+        if (File.Exists(originManifest))
+        {
+            using var origin = PackageOriginMetadata.TryLoadAndValidate(originManifest, packagePath)
+                ?? throw new InvalidDataException("No se pudo leer el perfil de origen Methos.");
+            var encoding = origin.RootElement.GetProperty("encoding");
+            int? recordedProtocol = encoding.TryGetProperty("protocol_version", out var protocolValue) &&
+                protocolValue.ValueKind == System.Text.Json.JsonValueKind.Number
+                ? protocolValue.GetInt32() : null;
+            if (recordedProtocol.HasValue)
+                throw new NotSupportedException($"El paquete original usaba el protocolo {recordedProtocol}. El perfil fue conservado, pero el codificador U para ese protocolo todavía no está integrado. No se generó un archivo con cifrado diferente.");
+            Log("Perfil de origen verificado por SHA-256. No se detectó protocolo cifrado que requiera recodificación.");
+        }
+
         var ucFiles = GetSourceFiles(sourceDirectory);
         if (ucFiles.Length == 0)
             throw new InvalidOperationException($"No se encontraron archivos .uc en {sourceDirectory}");
