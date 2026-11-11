@@ -273,8 +273,9 @@ jobs:
           }
           $xdatExe = Join-Path $installDir "XDAT\\Methos XDAT.exe"
           if (!(Test-Path $xdatExe)) { throw "El instalador no incluyó el módulo XDAT." }
-          $xdatEngine = Join-Path $installDir "XDAT\\l2encdec.exe"
-          if (!(Test-Path $xdatEngine)) { throw "El instalador no incluyó el motor de cifrado XDAT." }
+          $xdatEngine = Get-ChildItem -LiteralPath (Join-Path $installDir "XDAT") -Recurse -File -Filter "l2encdec.exe" | Select-Object -First 1
+          if (!$xdatEngine) { throw "El instalador no incluyó el motor de cifrado XDAT dentro del módulo." }
+          Write-Host "Motor XDAT encontrado en: $($xdatEngine.FullName)"
 
           $xdatProcess = Start-Process -FilePath $xdatExe -WorkingDirectory (Split-Path $xdatExe) -PassThru
           Start-Sleep -Seconds 8
