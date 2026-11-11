@@ -20,9 +20,9 @@ internal static class Program
 
 internal sealed class MainForm : Form
 {
-    private readonly string docsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Methos U Editor");
-    private string CompleteDir => Path.Combine(docsRoot, "u completo");
-    private string PartsDir => Path.Combine(docsRoot, "u por partes");
+    private string AppRoot => AppContext.BaseDirectory;
+    private string CompleteDir => Path.Combine(AppRoot, "Archivos U", "Comprimido");
+    private string PartsDir => Path.Combine(AppRoot, "Archivos U", "Descomprimido");
     private const string OriginalInterfaceSha256 = "A3074E83A54D3C681BC67830D87BC38FDAB1D0A30EB77384DA2F615F619D5B71";
     private string UccRuntimeRoot => Path.Combine(AppContext.BaseDirectory, "UccRuntime");
     private string SourceCacheRoot => Path.Combine(
@@ -46,7 +46,7 @@ internal sealed class MainForm : Form
         Directory.CreateDirectory(PartsDir);
         BuildLayout();
         RefreshInputs();
-        Log("Carpetas preparadas:");
+        Log("Carpetas de trabajo junto al programa:");
         Log(CompleteDir);
         Log(PartsDir);
     }
@@ -62,8 +62,8 @@ internal sealed class MainForm : Form
         var addU = new Button { Text = "Agregar .U", Width = 112, Height = 42 };
         var addZip = new Button { Text = "Importar ZIP", Width = 112, Height = 42 };
         var addFolder = new Button { Text = "Agregar carpeta", Width = 130, Height = 42 };
-        var openComplete = new Button { Text = "Abrir u completo", Width = 145, Height = 42 };
-        var openParts = new Button { Text = "Abrir u por partes", Width = 155, Height = 42 };
+        var openComplete = new Button { Text = "Abrir Comprimido", Width = 145, Height = 42 };
+        var openParts = new Button { Text = "Abrir Descomprimido", Width = 155, Height = 42 };
         actions.Controls.AddRange(new Control[] { addU, addZip, addFolder, decompile, compile, openComplete, openParts });
 
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 430, Padding = new Padding(10) };
