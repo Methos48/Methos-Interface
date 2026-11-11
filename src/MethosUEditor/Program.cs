@@ -451,7 +451,14 @@ internal sealed class MainForm : Form
             Log($"Aviso del analizador independiente: {ex.Message}");
         }
         if (TryRestoreExactSources(baseName, packageBytes, output))
+        {
+            string restoredMetadata = PackageOriginMetadata.Save(
+                path, packageBytes, output, "UnrealPackage",
+                detection.Status.ToString(), detection.Family, detection.Version,
+                detection.Header, detection.Detail);
+            Log($"Perfil de origen guardado: {restoredMetadata}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
             return;
+        }
 
         UnrealPackageIndex? nativeIndex = null;
         try { nativeIndex = UnrealPackageIndex.Parse(packageBytes); }
@@ -573,6 +580,12 @@ internal sealed class MainForm : Form
         }
         Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}; cierres sobrantes eliminados: {removedClosures}; funciones descompiladas/verificadas por Methos: {nativeFunctions}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
+        string metadataPath = PackageOriginMetadata.Save(
+            path, packageBytes, output, "UnrealPackage",
+            detection.Status.ToString(), detection.Family, detection.Version,
+            detection.Header, detection.Detail, package.Summary.Version,
+            package.Summary.LicenseeVersion);
+        Log($"Perfil de origen guardado: {metadataPath}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
     });
 
     private static string ApplyNativeBytecodeDecompilation(string source, UClass classObject,
