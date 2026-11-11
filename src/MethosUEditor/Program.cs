@@ -435,7 +435,17 @@ internal sealed class MainForm : Form
                 catch (Exception ex)
                 {
                     string name = Path.GetFileName(selected[i]);
-                    failures.Add($"{name}: {ex.GetBaseException().Message}");
+                    string detail = ex.GetBaseException().Message;
+                    const string sourceFailureMarker = "METHOS_SOURCE_FAILURES\\n";
+                    if (detail.StartsWith(sourceFailureMarker, StringComparison.Ordinal))
+                    {
+                        failures.AddRange(detail[sourceFailureMarker.Length..]
+                            .Split(new[] { '\\r', '\\n' }, StringSplitOptions.RemoveEmptyEntries));
+                    }
+                    else
+                    {
+                        failures.Add($"{name}: {detail}");
+                    }
                     Log($"ERROR EN {name}: {ex}");
                 }
             }
@@ -889,9 +899,7 @@ internal sealed class MainForm : Form
                 }
             }
             if (preflightFailures.Count > 0)
-                throw new InvalidDataException(
-                    $"La revisión previa encontró {preflightFailures.Count} fuente(s) con errores. No se inició UCC.\\n\\n" +
-                    string.Join("\\n", preflightFailures));
+                throw new InvalidDataException("METHOS_SOURCE_FAILURES\\n" + string.Join("\\n", preflightFailures));
             Log($"Revisión previa correcta: {ucFiles.Length} fuentes .uc. Iniciando UCC.");
             UccCompileResult uccResult = UccCompiler.CompileInterface(UccRuntimeRoot, sourceDirectory);
             string uccTemporaryOutput = Path.Combine(Path.GetTempPath(), "MethosU_UCC_" + Guid.NewGuid().ToString("N") + ".u");
