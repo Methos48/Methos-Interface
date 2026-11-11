@@ -1007,9 +1007,7 @@ internal sealed class MainForm : Form
         }
 
         if (sourceFailures.Count > 0)
-            throw new InvalidDataException(
-                $"La revisión de {ucFiles.Length} fuentes terminó con {sourceFailures.Count} archivo(s) defectuoso(s). No se generó ni reemplazó el paquete.\n\n" +
-                string.Join("\n", sourceFailures));
+            throw new InvalidDataException("METHOS_SOURCE_FAILURES\\n" + string.Join("\\n", sourceFailures));
         if (classesProcessed == 0 || functionsCompiled == 0)
             throw new NotSupportedException("El motor nativo todavía no encontró funciones compatibles para compilar. No se reemplazó el .u. Actualmente admite un subconjunto de cuerpos return con literales; el soporte general de UnrealScript sigue en desarrollo.");
 
