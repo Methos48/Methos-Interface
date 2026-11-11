@@ -203,12 +203,18 @@ jobs:
           Write-Host "Instalación de prueba en: $installDir"
 
           $app = Join-Path $installDir "Methos U Editor.exe"
-          $ucc = Join-Path $installDir "UccRuntime\Interlude\System\ucc.exe"
+          $system = Join-Path $installDir "UccRuntime\Interlude\System"
+          $ucc = Join-Path $system "ucc.exe"
           $reference = Join-Path $installDir "UccRuntime\Interlude\Interface\Classes"
           if (!(Test-Path $app)) { throw "El instalador no colocó la aplicación." }
-          if (!(Test-Path $ucc)) { throw "El instalador no incluyó UCC." }
+          foreach ($required in @("ucc.exe", "UIScript.ini", "Core.u", "Engine.u", "NWindow.u")) {
+            if (!(Test-Path (Join-Path $system $required))) { throw "Falta el componente UCC requerido: $required." }
+          }
           $classes = (Get-ChildItem -LiteralPath $reference -File -Filter "*.uc").Count
-          if ($classes -lt 150) { throw "El runtime instalado solo contiene $classes clases de referencia." }
+          if ($classes -ne 169) { throw "Se esperaban exactamente 169 fuentes de referencia; se instalaron $classes." }
+          foreach ($requiredClass in @("UICommonAPI.uc", "AutoBuffWnd.uc", "AutoPotionsWnd.uc", "AutoSkillWnd.uc")) {
+            if (!(Test-Path (Join-Path $reference $requiredClass))) { throw "Falta la fuente de referencia requerida: $requiredClass." }
+          }
           $documents = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Methos U Editor"
           foreach ($folder in @("u completo", "u por partes")) {
             if (!(Test-Path (Join-Path $documents $folder))) { throw "No se creó la carpeta de trabajo '$folder'." }
