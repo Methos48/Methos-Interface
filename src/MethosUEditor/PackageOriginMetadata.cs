@@ -52,6 +52,25 @@ internal static class PackageOriginMetadata
                 original_file_preserved = true
             }
         };
+        string originalsDirectory = Path.Combine(metadataDirectory, "originals");
+        Directory.CreateDirectory(originalsDirectory);
+        string immutableOriginal = Path.Combine(originalsDirectory, Path.GetFileName(sourcePath));
+        if (!File.Exists(immutableOriginal))
+        {
+            string originalTemporary = immutableOriginal + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllBytes(originalTemporary, originalBytes);
+                File.Move(originalTemporary, immutableOriginal, overwrite: false);
+            }
+            finally { if (File.Exists(originalTemporary)) File.Delete(originalTemporary); }
+        }
+        else
+        {
+            string savedHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(immutableOriginal)));
+            if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(hash), Convert.FromHexString(savedHash)))
+                throw new InvalidDataException("Ya existe una copia original inmutable diferente para este paquete.");
+        }
         string destination = Path.Combine(metadataDirectory, "origin.json");
         string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
