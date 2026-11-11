@@ -24,6 +24,12 @@ foreach (int protocol in new[] { 111, 120, 121, 211, 212, 411, 412, 413, 414, 61
 var unknownProtocol = Lineage2FileDetector.Detect(EncryptionHeader(999));
 Assert(unknownProtocol.Status == "unsupported_version" && unknownProtocol.Encrypted == true,
     "Unknown Lineage II protocol was not reported as an unsupported encrypted file.");
+foreach (int protocol in new[] { 121, 821 })
+{
+    var filenameDependent = Lineage2FileDetector.Detect(EncryptionHeader(protocol));
+    Assert(filenameDependent.FilenameRequired,
+        $"Protocol {protocol} must retain the original filename for decoding.");
+}
 var malformedProtocol = Lineage2FileDetector.Detect(System.Text.Encoding.Unicode.GetBytes("Lineage2VerABC"));
 Assert(malformedProtocol.Status == "malformed_header", "Malformed encryption header was accepted.");
 byte[] unrealHeader = new byte[36];
@@ -35,6 +41,11 @@ Assert(plainPackage.Status == "plain_candidate" && plainPackage.Family == "UNREA
 var unknownFile = Lineage2FileDetector.Detect(new byte[] { 0xFF, 0xED, 0xFA, 0xCE, 0x01 });
 Assert(unknownFile.Status == "unknown_or_truncated" && unknownFile.Encrypted is null,
     "Unknown file signature was incorrectly classified as plaintext or encrypted.");
+byte[] userXdatSignature = Convert.FromHexString("FFEDFACE0100FE0FC39D0109E1BB1ADF")
+    .Concat(new byte[100]).ToArray();
+var unknownXdat = Lineage2FileDetector.Detect(userXdatSignature);
+Assert(unknownXdat.Status == "unknown_or_truncated" && unknownXdat.Encrypted is null,
+    "The supplied XDAT signature must remain unknown, not be guessed as encrypted or plaintext.");
 
 static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
 {
