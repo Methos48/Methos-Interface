@@ -281,6 +281,11 @@ jobs:
             if (!(Test-Path (Join-Path $workRoot $folder))) { throw "No se creó la carpeta de trabajo '$folder' dentro de Archivos U." }
           }
 
+          $xdatWorkRoot = Join-Path $installDir "Archivos XDAT"
+          foreach ($folder in @("Comprimido", "Descomprimido")) {
+            if (!(Test-Path (Join-Path $xdatWorkRoot $folder))) { throw "No se creó la carpeta de trabajo '$folder' dentro de Archivos XDAT." }
+          }
+
           $process = Start-Process -FilePath $app -PassThru
           Start-Sleep -Seconds 8
           $process.Refresh()
