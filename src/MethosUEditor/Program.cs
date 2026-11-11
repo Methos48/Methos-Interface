@@ -871,7 +871,25 @@ internal sealed class MainForm : Form
         if (baseName.Equals("Interface", StringComparison.OrdinalIgnoreCase) &&
             UccCompiler.IsAvailable(UccRuntimeRoot))
         {
-            Log($"Compilador UCC Interlude detectado. Compilando {ucFiles.Length} fuentes .uc con el backend completo.");
+            var preflightFailures = new List<string>();
+            foreach (string sourcePath in ucFiles)
+            {
+                try
+                {
+                    string text = File.ReadAllText(sourcePath);
+                    _ = UnrealScriptSourceIndex.RepairMissingFunctionClosures(text);
+                    _ = UnrealScriptSourceIndex.ParseFunctions(text);
+                }
+                catch (Exception ex)
+                {
+                    preflightFailures.Add($"{Path.GetFileName(sourcePath)}: {ex.GetBaseException().Message}");
+                }
+            }
+            if (preflightFailures.Count > 0)
+                throw new InvalidDataException(
+                    $"La revisión previa encontró {preflightFailures.Count} fuente(s) con errores. No se inició UCC.\\n\\n" +
+                    string.Join("\\n", preflightFailures));
+            Log($"Revisión previa correcta: {ucFiles.Length} fuentes .uc. Iniciando UCC.");
             UccCompileResult uccResult = UccCompiler.CompileInterface(UccRuntimeRoot, sourceDirectory);
             string uccTemporaryOutput = Path.Combine(Path.GetTempPath(), "MethosU_UCC_" + Guid.NewGuid().ToString("N") + ".u");
             try
