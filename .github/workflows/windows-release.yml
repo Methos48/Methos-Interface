@@ -250,17 +250,17 @@ jobs:
       - name: Probar instalación silenciosa y arranque de Methos U Editor
         shell: pwsh
         run: |
-          $setup = Join-Path $PWD "release\Methos-U-Editor-Setup.exe"
+          $setup = Join-Path $PWD "release\Methos-Setup.exe"
           if (!(Test-Path $setup)) { throw "No se generó el instalador." }
           if ((Get-Item $setup).Length -lt 1MB) { throw "El instalador parece incompleto o demasiado pequeño." }
 
-          $installDir = Join-Path $env:RUNNER_TEMP "Methos U Editor Smoke Test"
+          $installDir = Join-Path $env:RUNNER_TEMP "Methos Smoke Test"
           $installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR=`"$installDir`""
           $install = Start-Process -FilePath $setup -ArgumentList $installArgs -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "La instalación silenciosa falló con código $($install.ExitCode)." }
           Write-Host "Instalación de prueba en: $installDir"
 
-          $app = Join-Path $installDir "Methos U Editor.exe"
+          $app = Join-Path $installDir "Methos.exe"
           $system = Join-Path $installDir "UccRuntime\Interlude\System"
           $ucc = Join-Path $system "ucc.exe"
           $reference = Join-Path $installDir "UccRuntime\Interlude\Interface\Classes"
@@ -299,7 +299,7 @@ jobs:
           $process = Start-Process -FilePath $app -PassThru
           Start-Sleep -Seconds 8
           $process.Refresh()
-          if ($process.HasExited) { throw "Methos U Editor se cerró durante la prueba de arranque (código $($process.ExitCode))." }
+          if ($process.HasExited) { throw "Methos se cerró durante la prueba de arranque (código $($process.ExitCode))." }
           Stop-Process -Id $process.Id -Force
           Write-Host "SMOKE TEST OK: instalación, aplicación, UCC y $classes fuentes de referencia."
 
@@ -312,6 +312,6 @@ jobs:
       - name: Publicar instalador de Windows x64
         uses: actions/upload-artifact@v4
         with:
-          name: Methos-U-Editor-Installer-Windows-x64
-          path: release/Methos-U-Editor-Setup.exe
+          name: Methos-Windows-Installer-x64
+          path: release/Methos-Setup.exe
           if-no-files-found: error
