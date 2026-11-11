@@ -24,6 +24,8 @@ internal sealed class MainForm : Form
     private string AppRoot => AppContext.BaseDirectory;
     private string CompleteDir => Path.Combine(AppRoot, "Archivos U", "Comprimido");
     private string PartsDir => Path.Combine(AppRoot, "Archivos U", "Descomprimido");
+    private string XdatCompleteDir => Path.Combine(AppRoot, "Archivos XDAT", "Comprimido");
+    private string XdatPartsDir => Path.Combine(AppRoot, "Archivos XDAT", "Descomprimido");
     private const string OriginalInterfaceSha256 = "A3074E83A54D3C681BC67830D87BC38FDAB1D0A30EB77384DA2F615F619D5B71";
     private string UccRuntimeRoot => Path.Combine(AppContext.BaseDirectory, "UccRuntime");
     private string SourceCacheRoot => Path.Combine(
@@ -70,6 +72,8 @@ internal sealed class MainForm : Form
         BackColor = Color.FromArgb(245, 247, 250);
         Directory.CreateDirectory(CompleteDir);
         Directory.CreateDirectory(PartsDir);
+        Directory.CreateDirectory(XdatCompleteDir);
+        Directory.CreateDirectory(XdatPartsDir);
         BuildLayout();
         RefreshInputs();
         Log("Carpetas de trabajo junto al programa:");
