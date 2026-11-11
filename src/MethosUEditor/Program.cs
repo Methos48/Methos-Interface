@@ -518,17 +518,42 @@ internal sealed class MainForm : Form
     {
         string hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes));
         string destinationRoot = Path.Combine(SourceCacheRoot, hash, packageName);
-        if (Directory.Exists(destinationRoot)) Directory.Delete(destinationRoot, recursive: true);
-        Directory.CreateDirectory(destinationRoot);
-
-        foreach (string source in GetSourceFiles(sourceDirectory))
+        string parent = Path.GetDirectoryName(destinationRoot)!;
+        Directory.CreateDirectory(parent);
+        string staging = Path.Combine(parent, "." + packageName + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        string previous = Path.Combine(parent, "." + packageName + "." + Guid.NewGuid().ToString("N") + ".old");
+        try
         {
-            string relative = Path.GetRelativePath(sourceDirectory, source);
-            string destination = Path.Combine(destinationRoot, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(source, destination, overwrite: true);
+            Directory.CreateDirectory(staging);
+            foreach (string source in GetSourceFiles(sourceDirectory))
+            {
+                string relative = Path.GetRelativePath(sourceDirectory, source);
+                string destination = Path.Combine(staging, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(source, destination, overwrite: false);
+            }
+
+            if (Directory.Exists(destinationRoot))
+                Directory.Move(destinationRoot, previous);
+            try
+            {
+                Directory.Move(staging, destinationRoot);
+            }
+            catch
+            {
+                if (Directory.Exists(previous) && !Directory.Exists(destinationRoot))
+                    Directory.Move(previous, destinationRoot);
+                throw;
+            }
+            if (Directory.Exists(previous)) Directory.Delete(previous, recursive: true);
+            Log($"Copia exacta de fuentes guardada en caché: {GetSourceFiles(destinationRoot).Length} clases; SHA-256={hash}.");
         }
-        Log($"Copia exacta de fuentes guardada en caché: {GetSourceFiles(sourceDirectory).Length} clases; SHA-256={hash}.");
+        finally
+        {
+            if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+            if (Directory.Exists(previous) && Directory.Exists(destinationRoot))
+                Directory.Delete(previous, recursive: true);
+        }
     }
 
     private static void BackupExistingFile(string path)
@@ -544,7 +569,19 @@ internal sealed class MainForm : Form
         string backupName = Path.GetFileNameWithoutExtension(path) + "_" +
             DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" +
             Guid.NewGuid().ToString("N")[..8] + Path.GetExtension(path);
-        File.Copy(path, Path.Combine(backupRoot, backupName), overwrite: true);
+        string destination = Path.Combine(backupRoot, backupName);
+        string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.Copy(path, temporary, overwrite: false);
+            using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                stream.Flush(flushToDisk: true);
+            File.Move(temporary, destination, overwrite: false);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     private Task CompileFolder(string packagePath) => Task.Run(() =>
