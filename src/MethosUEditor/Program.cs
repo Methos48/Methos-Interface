@@ -424,18 +424,33 @@ internal sealed class MainForm : Form
         if (files.SelectedIndices.Count == 0) { MessageBox.Show("Selecciona uno o más archivos .u de la lista."); return; }
         var selected = files.SelectedIndices.Cast<int>().Where(i => i >= 0 && i < inputs.Count).Select(i => inputs[i]).ToList();
         SetBusy(true);
+        var failures = new List<string>();
         try
         {
             for (int i = 0; i < selected.Count; i++)
             {
                 progress.Value = (int)((i * 100.0) / selected.Count);
                 status.Text = $"{i + 1}/{selected.Count}: {Path.GetFileName(selected[i])}";
-                await action(selected[i]);
+                try { await action(selected[i]); }
+                catch (Exception ex)
+                {
+                    string name = Path.GetFileName(selected[i]);
+                    failures.Add($"{name}: {ex.GetBaseException().Message}");
+                    Log($"ERROR EN {name}: {ex}");
+                }
             }
             progress.Value = 100;
-            status.Text = "Proceso finalizado";
+            status.Text = failures.Count == 0 ? "Proceso finalizado" : $"Finalizado con {failures.Count} archivo(s) con errores";
+            if (failures.Count > 0)
+            {
+                string report = "Revisión completa. Se procesaron todos los archivos seleccionados.\n\n" +
+                    $"Archivos revisados: {selected.Count}\nArchivos con errores: {failures.Count}\n\n" +
+                    string.Join("\n\n", failures);
+                Log(report);
+                MessageBox.Show(report, "Informe de compilación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else MessageBox.Show($"Revisión terminada. Todos los {selected.Count} archivos seleccionados finalizaron sin errores.", "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        catch (Exception ex) { Log("ERROR: " + ex); MessageBox.Show(ex.Message, "Methos U Editor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         finally { SetBusy(false); }
     }
 
@@ -896,11 +911,14 @@ internal sealed class MainForm : Form
             .ToDictionary(item => item.Name.ToString(), StringComparer.OrdinalIgnoreCase);
 
         int classesProcessed = 0, functionsCompiled = 0, repairedFunctions = 0, insertedClosures = 0;
+        var sourceFailures = new List<string>();
         foreach (string sourcePath in ucFiles)
         {
             string className = Path.GetFileNameWithoutExtension(sourcePath);
+            try
+            {
             if (!classes.TryGetValue(className, out var classObject))
-                throw new InvalidDataException($"La clase '{className}' no existe como UClass en el paquete base. Crear clases nuevas todavía no está implementado; no se modificó el paquete.");
+                throw new InvalidDataException($"La clase '{className}' no existe como UClass en el paquete base. Crear clases nuevas todavía no está implementado.");
 
             string sourceText = File.ReadAllText(sourcePath);
             var sourceRepair = UnrealScriptSourceIndex.RepairMissingFunctionClosures(sourceText);
@@ -951,8 +969,18 @@ internal sealed class MainForm : Form
             Log($"Clase compilada con motor nativo: {className}; funciones={result.FunctionsCompiled}; reparaciones={sourceRepair.Repairs.Count}.");
             foreach (var repair in sourceRepair.Repairs)
                 Log($"  Reparación auditada: {repair.FunctionName}, línea {repair.Line}, llaves insertadas={repair.ClosuresInserted}.");
+            }
+            catch (Exception ex)
+            {
+                sourceFailures.Add($"{Path.GetFileName(sourcePath)}: {ex.GetBaseException().Message}");
+                Log($"ARCHIVO CON ERROR: {Path.GetFileName(sourcePath)}: {ex}");
+            }
         }
 
+        if (sourceFailures.Count > 0)
+            throw new InvalidDataException(
+                $"La revisión de {ucFiles.Length} fuentes terminó con {sourceFailures.Count} archivo(s) defectuoso(s). No se generó ni reemplazó el paquete.\n\n" +
+                string.Join("\n", sourceFailures));
         if (classesProcessed == 0 || functionsCompiled == 0)
             throw new NotSupportedException("El motor nativo todavía no encontró funciones compatibles para compilar. No se reemplazó el .u. Actualmente admite un subconjunto de cuerpos return con literales; el soporte general de UnrealScript sigue en desarrollo.");
 
