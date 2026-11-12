@@ -1,5 +1,5 @@
 #define MyAppName "Methos"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppExeName "Methos.exe"
 
 [Setup]
