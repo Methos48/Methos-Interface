@@ -11,8 +11,14 @@ namespace MethosUEditor;
 internal static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Contains("--xdat-self-test", StringComparer.OrdinalIgnoreCase))
+        {
+            try { XdatBridge.SelfTest(); Environment.ExitCode = 0; }
+            catch { Environment.ExitCode = 1; }
+            return;
+        }
         ApplicationConfiguration.Initialize();
         Application.Run(new MainForm());
     }
