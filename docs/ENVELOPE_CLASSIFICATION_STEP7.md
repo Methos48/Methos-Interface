@@ -166,3 +166,25 @@ Sources:
 
 Status update:
 The SmartCrypt identification is strongly supported as a protection family for Interlude interface U/XDAT files. The 2021 and 2024 extraction mechanisms are now understood at a high level. The exact L2Sudamerica protection revision, output layer, and any additional U obfuscation remain to be tested against the uploaded binaries.
+
+
+## Step 12 — exact six-byte prefix search
+
+Date: 2026-11-11
+
+A targeted public search for the exact byte sequence `FF ED FA CE 01 00`, and for its four-byte prefix in Lineage II / SmartCrypt contexts, did not locate a published format specification or a matching implementation.
+
+One superficial resemblance was noted:
+- The sequence begins `FF ED FA CE`, which differs by one byte from the classic big-endian 32-bit Mach-O magic `FE ED FA CE`.
+- This is not enough to identify the file as Mach-O or to infer that SmartCrypt uses a Mach-O marker. The samples are Lineage II client assets and the leading byte may be a custom marker, a transformed value, or coincidental.
+- No decoder should branch on this resemblance without further structural or runtime evidence.
+
+The prefix therefore remains an unresolved outer-envelope signature. The stronger evidence for SmartCrypt comes from the presence of the matching client protection modules and published Interlude U/XDAT cases, not from this four-byte resemblance.
+
+Sources consulted:
+- https://maxcheaters.com/topic/245142-decrypt-interfaceuxdat-interlude/
+- https://maxcheaters.com/topic/239616-smart-crypt-decryptor/
+- https://mmo-dev.info/resources/smart-decryptor.3096/
+
+Status:
+Exact prefix not identified. SmartCrypt protection family strongly supported, exact client revision and envelope transformation still unproven.
