@@ -34,8 +34,5 @@ Name: "{app}\Archivos XDAT\Descomprimido"
 Name: "{autoprograms}\Methos"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\Methos"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
-[Tasks]
-Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Accesos directos:"
-
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Abrir Methos"; Flags: postinstall nowait skipifsilent
