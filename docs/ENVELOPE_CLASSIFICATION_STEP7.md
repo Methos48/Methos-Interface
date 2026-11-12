@@ -325,3 +325,22 @@ Sources:
 
 Status:
 The two-stage SmartCrypt -> standard L2 encryption workflow is now independently corroborated. No capture/decryption of the user's exact `interface.u` or `interface.xdat` has yet been executed or verified.
+
+
+## Step 17 — 2025 SmartDecrypt variant and ActiveAntiCheatCrypt boundary
+
+Date: 2026-11-12
+
+A later author update in the same Smart Crypt Decryptor 1.5.2.2 thread (2025-08-16) links a revised source at https://pastebin.com/ESvWBZ4H and states that it works with "Active Anti Cheat Crypt". This is a distinct compatibility claim from the original 2024 source, which only documents SmartCrypt capture and the remaining regular Lineage II archive encryption.
+
+Interpretation:
+- ActiveAntiCheatCrypt may be an additional wrapper/layer present in some clients or target files. The 2025 update suggests the revised hook can handle that case.
+- The user's current samples begin with the same unusual outer marker recorded in earlier steps, but that marker alone does not prove ActiveAntiCheatCrypt. Do not classify the user's files as AAC-protected without inspecting the exact revised source or testing the captured output.
+- The 2025 source paste is not accessible through the current web retrieval interface, so its code changes, hook points, and correctness have not been audited. The original source's known byte-count, offset, partial-read, and overlapped-I/O risks must not be assumed fixed.
+- This discovery does not change the current leading plan: use a disposable client copy, capture each target independently, validate the complete output, detect the remaining inner L2 encryption version, then run the correct standard decoder. If the capture still contains an ActiveAntiCheatCrypt marker or wrapper, investigate the 2025 variant as a separate stage.
+
+Source:
+- https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/ (author's 2025-08-16 update linking https://pastebin.com/ESvWBZ4H)
+
+Status:
+This is a new compatibility lead only. Neither the 2025 source nor the exact user's U/XDAT outputs have been executed or validated. No decryption success is claimed.
