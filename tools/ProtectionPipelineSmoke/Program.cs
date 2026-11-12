@@ -13,8 +13,15 @@ Check(smart.Status == "recognized-key-required" && !smart.CanDecode && !smart.Ca
 
 byte[] l2 = Encoding.Unicode.GetBytes("Lineage2Ver413");
 var lineage = ProtectionPipelinePlanner.Inspect(l2, "systemmsg-e.dat");
-Check(lineage.Status == "recognized-encryption" && !lineage.CanDecode && !lineage.CanEncode,
-    "Lineage2Ver413 must be identified without claiming a codec is available.");
+Check(lineage.Status == "recognized-supported-encryption" && lineage.CanDecode && lineage.CanEncode,
+    "Lineage2Ver413 must be identified as a supported codec.");
+
+var codec413 = new Lineage2StandardCodec(413);
+byte[] knownPayload413 = Encoding.UTF8.GetBytes("Methos protocol 413 round-trip verification.");
+byte[] encrypted413 = codec413.Encode(knownPayload413, "systemmsg-e.dat");
+byte[] decoded413 = codec413.Decode(encrypted413, "systemmsg-e.dat");
+Check(decoded413.AsSpan().SequenceEqual(knownPayload413),
+    "Lineage2Ver413 encode/decode round-trip failed.");
 
 var unknown = ProtectionPipelinePlanner.Inspect(new byte[] { 0x12, 0x34, 0x56 }, "unknown.bin");
 Check(unknown.Status == "unknown-or-unsupported" && !unknown.CanDecode,
