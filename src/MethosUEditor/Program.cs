@@ -1270,24 +1270,48 @@ internal sealed class MainForm : Form
 
     private static void ReplaceArchiveWithCompiledFile(string compiledFile, string archiveDirectory, string outputFileName)
     {
-        Directory.CreateDirectory(archiveDirectory);
-        string[] existingFiles = Directory.GetFiles(archiveDirectory, "*", SearchOption.AllDirectories);
-        foreach (string existing in existingFiles)
-            BackupExistingFile(existing);
-        ClearDirectoryContents(archiveDirectory);
+        if (!File.Exists(compiledFile))
+            throw new FileNotFoundException("No se encontró el archivo compilado que se va a publicar.", compiledFile);
 
+        var info = new FileInfo(compiledFile);
+        if (info.Length == 0)
+            throw new InvalidDataException("El archivo compilado está vacío; se conserva intacto el Archivo anterior.");
+
+        Directory.CreateDirectory(archiveDirectory);
+        string archiveParent = Directory.GetParent(Path.GetFullPath(archiveDirectory))!.FullName;
+        Directory.CreateDirectory(archiveParent);
+        string staged = Path.Combine(archiveParent, "." + outputFileName + "." + Guid.NewGuid().ToString("N") + ".staged");
         string destination = Path.Combine(archiveDirectory, outputFileName);
-        string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
         try
         {
-            File.Copy(compiledFile, temporary, overwrite: false);
-            using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            // Preparar y validar fuera de Archivo: nunca borrar el original por un fallo de copia.
+            File.Copy(compiledFile, staged, overwrite: false);
+            using (var stream = new FileStream(staged, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 stream.Flush(flushToDisk: true);
-            File.Move(temporary, destination, overwrite: false);
+            if (new FileInfo(staged).Length != info.Length)
+                throw new IOException("La copia temporal del paquete compilado no coincide en tamaño.");
+
+            string[] existingFiles = Directory.GetFiles(archiveDirectory, "*", SearchOption.AllDirectories);
+            foreach (string existing in existingFiles)
+                BackupExistingFile(existing);
+
+            ClearDirectoryContents(archiveDirectory);
+            try
+            {
+                File.Move(staged, destination, overwrite: false);
+            }
+            catch
+            {
+                // Si el movimiento falla, recuperar el paquete compilado desde el staging validado.
+                if (!File.Exists(destination) && File.Exists(staged))
+                    File.Copy(staged, destination, overwrite: false);
+                throw;
+            }
         }
         finally
         {
-            if (File.Exists(temporary)) File.Delete(temporary);
+            if (File.Exists(staged)) File.Delete(staged);
         }
     }
 
