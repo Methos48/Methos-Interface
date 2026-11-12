@@ -74,6 +74,12 @@ internal sealed class MainForm : Form
         Width = 980; Height = 700; MinimumSize = new Size(820, 560);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(245, 247, 250);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "Archivos U", "Comprimido"), CompleteDir);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "Archivos U", "Descomprimido"), PartsDir);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "Archivos XDAT", "Comprimido"), XdatCompleteDir);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "Archivos XDAT", "Descomprimido"), XdatPartsDir);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "XDAT", "Archivos XDAT", "Comprimido"), XdatCompleteDir);
+        MigrateLegacyFolder(Path.Combine(AppRoot, "XDAT", "Archivos XDAT", "Descomprimido"), XdatPartsDir);
         Directory.CreateDirectory(CompleteDir);
         Directory.CreateDirectory(PartsDir);
         Directory.CreateDirectory(XdatCompleteDir);
@@ -83,6 +89,28 @@ internal sealed class MainForm : Form
         Log("Estructura de trabajo Compilados/U y Compilados/XDAT creada junto al programa:");
         Log(CompleteDir);
         Log(PartsDir);
+    }
+
+    private static void MigrateLegacyFolder(string legacyFolder, string newFolder)
+    {
+        if (!Directory.Exists(legacyFolder) ||
+            string.Equals(Path.GetFullPath(legacyFolder), Path.GetFullPath(newFolder), StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Directory.CreateDirectory(newFolder);
+        foreach (string directory in Directory.GetDirectories(legacyFolder, "*", SearchOption.AllDirectories))
+        {
+            string relative = Path.GetRelativePath(legacyFolder, directory);
+            Directory.CreateDirectory(Path.Combine(newFolder, relative));
+        }
+        foreach (string source in Directory.GetFiles(legacyFolder, "*", SearchOption.AllDirectories))
+        {
+            string relative = Path.GetRelativePath(legacyFolder, source);
+            string destination = Path.Combine(newFolder, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            if (!File.Exists(destination))
+                File.Copy(source, destination, overwrite: false);
+        }
     }
 
     private void BuildLayout()
