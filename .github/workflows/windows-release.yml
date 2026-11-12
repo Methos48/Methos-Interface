@@ -187,75 +187,42 @@ jobs:
           $xdatCommit = (git -C "$env:GITHUB_WORKSPACE\\xdat-source" rev-parse HEAD).Trim()
           Write-Host "Commit XDAT integrado en Methos: $xdatCommit"
 
-      - name: Instalar Python 3.12 para el módulo XDAT
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          architecture: x64
+      - name: Preparar runtime Python embebido para XDAT (sin segundo ejecutable)
+        shell: pwsh
+        run: |
+          $runtimeRoot = Join-Path $PWD "publish\\XdatRuntime"
+          $pythonRoot = Join-Path $runtimeRoot "Python"
+          New-Item -ItemType Directory -Force $pythonRoot | Out-Null
+          $pythonZip = Join-Path $env:RUNNER_TEMP "python-3.12.10-embed-amd64.zip"
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip" -OutFile $pythonZip
+          Expand-Archive -LiteralPath $pythonZip -DestinationPath $pythonRoot -Force
+          $pth = Join-Path $pythonRoot "python312._pth"
+          if (!(Test-Path $pth)) { throw "El runtime embebido no contiene python312._pth." }
+          @("python312.zip", ".", "import site") | Set-Content -Encoding ascii $pth
+          $xdatProject = Get-ChildItem (Join-Path $env:RUNNER_TEMP "methos-xdat-kit") -Directory | Select-Object -First 1
+          if (!$xdatProject) { throw "No se encuentra el código fuente XDAT extraído." }
+          Copy-Item (Join-Path $xdatProject.FullName "xdat_core.py") (Join-Path $runtimeRoot "xdat_core.py") -Force
+          Copy-Item "src/MethosUEditor/XdatBridge.py" (Join-Path $runtimeRoot "xdat_bridge.py") -Force
+          foreach ($required in @("python312.dll", "python312.zip", "vcruntime140.dll", "xdat_core.py", "xdat_bridge.py")) {
+            if (!(Test-Path (Join-Path $pythonRoot $required)) -and !(Test-Path (Join-Path $runtimeRoot $required))) {
+              throw "Falta el componente Python embebido: $required."
+            }
+          }
+          Write-Host "Runtime Python embebido preparado para cargar el motor XDAT dentro de Methos.exe."
 
-      - name: Compilar y probar el módulo XDAT
+      - name: Verificar motor XDAT y pruebas de reconstrucción
         shell: pwsh
         run: |
           $xdatRepo = Join-Path $env:GITHUB_WORKSPACE "xdat-source"
-          $zip = Join-Path $xdatRepo "Methos_XDAT_Windows_Build_Kit_v1.0 (1).zip"
-          if (!(Test-Path $zip)) { throw "No se encontró el kit fuente de Methos XDAT." }
-          $extract = Join-Path $env:RUNNER_TEMP "methos-xdat-kit"
-          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
-          $project = Get-ChildItem $extract -Directory | Select-Object -First 1
-          if (!$project) { throw "El kit XDAT no contiene la carpeta del proyecto." }
-
-          Write-Host "===== METHOS XDAT CORE SOURCE BEGIN ====="
-          Get-Content (Join-Path $project.FullName "xdat_core.py") -Raw
-          Write-Host "===== METHOS XDAT CORE SOURCE END ====="
-          Write-Host "===== METHOS XDAT DEPENDENCIES ====="
-          Get-Content (Join-Path $project.FullName "requirements-build.txt") -Raw
-
-          $sourceExport = Join-Path $env:GITHUB_WORKSPACE "xdat-source-diagnostic"
-          New-Item -ItemType Directory -Force $sourceExport | Out-Null
-          foreach ($sourceName in @("app.py", "xdat_core.py", "requirements-build.txt", "build_windows.bat")) {
-            $sourcePath = Join-Path $project.FullName $sourceName
-            if (Test-Path $sourcePath) { Copy-Item $sourcePath $sourceExport }
-          }
-
-          python "$xdatRepo\\apply_detection_layer.py" "$($project.FullName)"
-          if ($LASTEXITCODE -ne 0) { throw "Falló la capa de detección XDAT." }
-          python "$xdatRepo\\auto_pipeline_overlay.py" "$($project.FullName)"
-          if ($LASTEXITCODE -ne 0) { throw "Falló la integración del pipeline XDAT." }
-
-          $cryptoZip = Join-Path $env:RUNNER_TEMP "l2encdec-win32.zip"
-          Invoke-WebRequest -Uri "https://github.com/ritsuwastaken/open-l2encdec/releases/download/1.5.1/l2encdec-1.5.1-win32.zip" -OutFile $cryptoZip
-          $cryptoDir = Join-Path $env:RUNNER_TEMP "methos-xdat-crypto"
-          Expand-Archive -LiteralPath $cryptoZip -DestinationPath $cryptoDir -Force
-          $engine = Get-ChildItem $cryptoDir -Recurse -File | Where-Object { $_.Name -ieq "l2encdec.exe" } | Select-Object -First 1
-          if (!$engine) { throw "No se encontró el motor l2encdec.exe." }
-          Copy-Item $engine.FullName (Join-Path $project.FullName "l2encdec.exe") -Force
-
-          python -m pip install --upgrade pip
-          python -m pip install -r (Join-Path $project.FullName "requirements-build.txt")
-          Push-Location $project.FullName
+          $xdatProject = Get-ChildItem (Join-Path $env:RUNNER_TEMP "methos-xdat-kit") -Directory | Select-Object -First 1
+          Push-Location $xdatProject.FullName
           try {
-            python -m py_compile app.py xdat_core.py encryption_detection.py auto_pipeline.py
-            if ($LASTEXITCODE -ne 0) { throw "Falló la verificación de sintaxis XDAT." }
+            python -m py_compile xdat_core.py encryption_detection.py auto_pipeline.py
+            if ($LASTEXITCODE -ne 0) { throw "Falló la verificación de sintaxis del motor XDAT." }
             python -m unittest discover -s tests -v
-            if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas XDAT." }
-            cmd /c build_windows.bat
-            if ($LASTEXITCODE -ne 0) { throw "Falló la compilación Windows del módulo XDAT." }
+            if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas del motor XDAT." }
           }
           finally { Pop-Location }
-
-          $xdatExe = Get-ChildItem (Join-Path $project.FullName "dist") -Recurse -File -Filter "Methos XDAT.exe" | Select-Object -First 1
-          if (!$xdatExe) { throw "La compilación XDAT terminó sin generar Methos XDAT.exe." }
-          $target = Join-Path $env:GITHUB_WORKSPACE "publish\\XDAT"
-          New-Item -ItemType Directory -Force $target | Out-Null
-          Copy-Item "$($xdatExe.Directory.FullName)\\*" -Destination $target -Recurse -Force
-          Write-Host "Módulo XDAT integrado en publish\\XDAT: $($xdatExe.FullName)"
-
-      - name: Publicar fuentes XDAT para integración nativa
-        uses: actions/upload-artifact@v4
-        with:
-          name: methos-xdat-integration-source
-          path: xdat-source-diagnostic/
-          if-no-files-found: error
 
       - name: Instalar Inno Setup
         shell: pwsh
