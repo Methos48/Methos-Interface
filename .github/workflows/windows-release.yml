@@ -210,6 +210,13 @@ jobs:
           Write-Host "===== METHOS XDAT DEPENDENCIES ====="
           Get-Content (Join-Path $project.FullName "requirements-build.txt") -Raw
 
+          $sourceExport = Join-Path $env:GITHUB_WORKSPACE "xdat-source-diagnostic"
+          New-Item -ItemType Directory -Force $sourceExport | Out-Null
+          foreach ($sourceName in @("app.py", "xdat_core.py", "requirements-build.txt", "build_windows.bat")) {
+            $sourcePath = Join-Path $project.FullName $sourceName
+            if (Test-Path $sourcePath) { Copy-Item $sourcePath $sourceExport }
+          }
+
           python "$xdatRepo\\apply_detection_layer.py" "$($project.FullName)"
           if ($LASTEXITCODE -ne 0) { throw "Falló la capa de detección XDAT." }
           python "$xdatRepo\\auto_pipeline_overlay.py" "$($project.FullName)"
@@ -242,6 +249,13 @@ jobs:
           New-Item -ItemType Directory -Force $target | Out-Null
           Copy-Item "$($xdatExe.Directory.FullName)\\*" -Destination $target -Recurse -Force
           Write-Host "Módulo XDAT integrado en publish\\XDAT: $($xdatExe.FullName)"
+
+      - name: Publicar fuentes XDAT para integración nativa
+        uses: actions/upload-artifact@v4
+        with:
+          name: methos-xdat-integration-source
+          path: xdat-source-diagnostic/
+          if-no-files-found: error
 
       - name: Instalar Inno Setup
         shell: pwsh
