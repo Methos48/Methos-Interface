@@ -59,3 +59,27 @@ Flujo esperado: cargar archivo → copia de seguridad automática → descompila
 ## Próxima acción
 
 Consultar GitHub Actions de la rama principal para los commits recientes del lanzador/icono. Si el workflow falló, leer el log del paso fallido y corregirlo. Si terminó correctamente, registrar el run y pasar a la validación funcional de ARCHIVOS U y ARCHIVOS XDAT.
+
+### 12-11-2026 — Instalador Methos Windows x64 generado y probado
+
+- **Resultado: compilación e instalación superadas.** GitHub Actions ejecutó el workflow `Methos U Editor - Windows Release` para el commit `05d379e99ad500432017f0d3cf973a57cc74d8ff`.
+- Ejecución: [Windows Release #438](https://github.com/Methos48/Methos-U-Editor/actions/runs/43234204448) — **SUCCESS**.
+- Los 19 pasos principales finalizaron correctamente, incluidos:
+  - generación del icono M roja;
+  - publicación autónoma de Methos para Windows x64;
+  - integración del runtime UCC y 169 fuentes de referencia;
+  - compilación y pruebas del módulo XDAT;
+  - creación del instalador Inno Setup;
+  - instalación silenciosa, comprobación de componentes y arranque de Methos;
+  - arranque de prueba del ejecutable XDAT;
+  - publicación del instalador como artefacto.
+- Artefacto generado: `Methos-Windows-Installer-x64`, ID `13950374516`, tamaño 77,461,895 bytes. SHA-256: `045b010a645c89f881e8e565c1cb99039a03e7083aa59aa8d859ce0c60658d9a`.
+- **Qué demuestra:** el instalador Windows x64 se generó; pudo instalarse silenciosamente; Methos y XDAT arrancaron; se encontraron los componentes UCC y las carpetas de trabajo. El instalador incluye el acceso directo de escritorio configurado en Inno Setup.
+- **Qué NO demuestra:** que todas las operaciones de descompilación/compilación U funcionen con cualquier archivo, ni que todos los formatos XDAT personalizados puedan descifrarse. Eso sigue siendo trabajo funcional separado.
+- **Entrega actual del instalador:** se encuentra guardada como artefacto de GitHub Actions en la ejecución enlazada arriba. Aún no es una publicación permanente de GitHub Releases.
+
+## Próximo bloque de trabajo
+
+1. Probar y corregir el recorrido funcional de ARCHIVOS U con paquetes reales: carga/copia de seguridad, descompilación, importación de fuentes, compilación y verificación.
+2. Probar el recorrido XDAT con archivos de referencia protegidos y no protegidos.
+3. Publicar una versión estable en GitHub Releases cuando el comportamiento funcional esté validado; conservar el nombre de producto **Methos**.
