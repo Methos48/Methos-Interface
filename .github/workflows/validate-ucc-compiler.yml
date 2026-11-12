@@ -95,12 +95,21 @@ jobs:
           $sourceDir = Join-Path $env:KIT "Interlude\Interface\Classes"
           $editedSourceDir = Join-Path $env:RUNNER_TEMP "Methos-U-Edited-Source-Test"
           Copy-Item -LiteralPath $sourceDir -Destination $editedSourceDir -Recurse -Force
-          $editedClass = Join-Path $editedSourceDir "UICommonAPI.uc"
-          [System.IO.File]::AppendAllText($editedClass, [Environment]::NewLine + "// Methos U edited-source compile test", [System.Text.Encoding]::Unicode)
+          $editedClass = Join-Path $editedSourceDir "GMInventoryWnd.uc"
+          $source = [System.IO.File]::ReadAllText($editedClass)
+          $pattern = '(?s)(function\s+int\s+IsLOrREar\s*\(\s*int\s+a_ServerID\s*\)\s*\{\s*return\s+)0(\s*;)'
+          $match = [regex]::Match($source, $pattern)
+          if (!$match.Success) { throw "No se encontró el cuerpo original de GMInventoryWnd.IsLOrREar para la prueba de modificación real." }
+          $edited = [regex]::Replace($source, $pattern, '${1}1${2}', 1)
+          if ($edited -eq $source) { throw "La modificación de GMInventoryWnd.IsLOrREar no produjo cambios." }
+          [System.IO.File]::WriteAllText($editedClass, $edited, [System.Text.UTF8Encoding]::new($false))
+          Write-Host "EDITED_SOURCE=GMInventoryWnd.IsLOrREar return 0 -> return 1"
           $output = Join-Path $env:KIT "Testar\system\Interface-csharp.u"
           dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --ucc-compile $env:KIT $editedSourceDir $output
           if ($LASTEXITCODE -ne 0) { throw "El backend UCC integrado en Methos U no pudo compilar." }
           & (Join-Path $env:KIT "ValidatePackage.ps1") -PackagePath $output
+          dotnet run --project tests/MethosUEngine.Tests/MethosUEngine.Tests.csproj -c Release -- --verify-function-return $output GMInventoryWnd IsLOrREar 1
+          if ($LASTEXITCODE -ne 0) { throw "El bytecode final no refleja la modificación de GMInventoryWnd.IsLOrREar." }
           $generatedHash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash
           $originalHash = (Get-FileHash -LiteralPath (Join-Path $PWD "Interface.u") -Algorithm SHA256).Hash
           Write-Host "METHOS_UCC_SHA256=$generatedHash"
