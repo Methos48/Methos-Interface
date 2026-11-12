@@ -131,6 +131,30 @@ static byte[] BuildFunctionFixture()
     return bytes;
 }
 
+if (args.Length >= 5 && args[0] == "--verify-function-return")
+{
+    string packagePath = args[1];
+    string className = args[2];
+    string functionName = args[3];
+    string expectedReturn = args[4];
+    using var compiledPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read);
+    compiledPackage.InitializePackage();
+    var classObject = compiledPackage.Objects.OfType<UClass>()
+        .Single(item => (int)item > 0 && item.Name.ToString().Equals(className, StringComparison.OrdinalIgnoreCase));
+    var function = EnumerateClassFunctions(classObject)
+        .Single(item => item.Name.ToString().Equals(functionName, StringComparison.OrdinalIgnoreCase));
+    var packageIndex = UnrealPackageIndex.Open(packagePath);
+    int exportReference = (int)function;
+    int scriptOffset = checked((int)function.ScriptOffset);
+    var export = packageIndex.Exports[exportReference - 1];
+    string compiledBody = UnrealScriptFunctionDecompiler.DecompileExport(
+        packageIndex, exportReference, scriptOffset, export.SerialSize - scriptOffset);
+    if (!compiledBody.Contains("return " + expectedReturn + ";", StringComparison.OrdinalIgnoreCase))
+        throw new Exception($"Compiled {className}.{functionName} did not contain expected return {expectedReturn}. Actual: {compiledBody}");
+    Console.WriteLine($"PASS: {className}.{functionName} was compiled with {compiledBody}");
+    return;
+}
+
 if (args.Length >= 4 && args[0] == "--ucc-compile")
 {
     string runtimeRoot = args[1];
