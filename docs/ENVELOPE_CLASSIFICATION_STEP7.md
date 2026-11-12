@@ -290,3 +290,38 @@ Controlled test plan (not yet executed):
 
 Status:
 The exact SmartCrypt module version aligns with the published SmartDecrypt 1.5.2.2 method. This is a strong actionable match, but no output from the user's exact U/XDAT samples has yet been captured or validated. Do not label either file decrypted until the controlled test passes.
+
+
+## Step 16 — independent SmartCrypt workflow confirms the second-stage decoder
+
+Date: 2026-11-12
+
+A second publication of the SmartDecrypt workflow (MMO-DEV, resource "Smart Decryptor", released 2024-03-13) clarifies the post-capture stage:
+- Rename the protected target to `SysString-e.dat`.
+- Launch `l2.exe`; acknowledge the expected integrity warning.
+- Collect `decrypted_file.txt` and rename it back to the original filename.
+- If the file was encrypted with the regular Lineage II layer before SmartCrypt, pass the captured file through `mxencdec.exe`.
+- The guide explicitly describes the capture result as requiring the regular L2 decryptor for that earlier layer.
+
+This independently confirms the two-stage model:
+1. SmartDecrypt removes/captures the SmartCrypt layer through the client's file-read path.
+2. A standard L2 decoder (e.g. mxencdec for supported versions) removes the remaining archive encryption.
+
+The 2024 English thread also documents `interface.u/xdat` as targets and says the captured output remains regular L2 encryption (413/111/etc.). A user later reports success after correcting the CFF import-section configuration; the author confirms the output can then be opened with an L2 file editor.
+
+Important scope:
+- The documented MMO-DEV walkthrough explicitly demonstrates `interface.u`; the English discussion explicitly names both `.u` and `.xdat`. We still require independent output validation for each exact sample.
+- Neither source proves the user's exact files share the same inner L2 version or that U has no additional obfuscation.
+- The public hook source still has the incorrect byte-count / ordering assumptions recorded in Step 15. Rebuild a corrected capture, do not trust the sample's raw dump.
+
+Practical implication for Methos:
+- Treat SmartCrypt extraction and regular L2 archive decryption as separate pipeline stages.
+- Do not feed the SmartDecrypt output directly to the U/XDAT parser until the inner version is detected and decoded.
+- Keep separate format detectors and validation paths for `.u` and `.xdat`.
+
+Sources:
+- https://mmo-dev.info/resources/smart-decryptor.3096/
+- https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/
+
+Status:
+The two-stage SmartCrypt -> standard L2 encryption workflow is now independently corroborated. No capture/decryption of the user's exact `interface.u` or `interface.xdat` has yet been executed or verified.
