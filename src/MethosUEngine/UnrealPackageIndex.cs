@@ -225,18 +225,26 @@ public sealed class UnrealPackageIndex
             RequireRange(data, position, 1, "índice compacto");
             byte next = data[position++];
             bool fifthByte = bytes == 4;
-            if (fifthByte && (next & 0xF0) != 0)
-                throw new InvalidDataException("El quinto byte del índice compacto contiene bits reservados.");
-            value |= (uint)(next & (fifthByte ? 0x0F : 0x7F)) << shift;
-            bytes++;
-            if (fifthByte && (next & 0x80) != 0)
-                throw new InvalidDataException("El índice compacto continúa después del quinto byte.");
-            shift += 7;
-            more = (next & 0x80) != 0;
+            if (fifthByte)
+            {
+                // Unreal FCompactIndex's fifth byte contributes the full byte at
+                // bit 27. The 32-bit accumulator naturally discards overflow bits.
+                // The fifth byte is fully data, including bit 7; it is not a continuation flag.
+                value |= (uint)next << shift;
+                bytes++;
+                more = false;
+            }
+            else
+            {
+                value |= (uint)(next & 0x7F) << shift;
+                bytes++;
+                shift += 7;
+                more = (next & 0x80) != 0;
+            }
         }
-        if (value > int.MaxValue) throw new InvalidDataException("Índice compacto fuera del rango Int32.");
+        int decoded = unchecked((int)value);
         if (negative && value == 0) throw new InvalidDataException("Índice compacto contiene cero negativo.");
-        return negative ? -(int)value : (int)value;
+        return negative ? unchecked(-decoded) : decoded;
     }
 
     private static int ReadI32(byte[] data, ref int position)
