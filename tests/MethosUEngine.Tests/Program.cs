@@ -373,14 +373,11 @@ foreach (int sample in new[] { 0, 1, -1, 63, 64, -64, 8191, 8192, int.MaxValue, 
     Assert(decoded == sample && cursor == encoded.Length, $"Compact index mismatch for {sample}.");
 }
 
-bool rejectedMalformed = false;
-try
-{
-    int cursor = 0;
-    UnrealPackageIndex.DecodeCompactIndex(new byte[] { 0x40, 0x80, 0x80, 0x80, 0x80 }, ref cursor);
-}
-catch (InvalidDataException) { rejectedMalformed = true; }
-Assert(rejectedMalformed, "Malformed five-byte compact index was accepted.");
+int overflowCursor = 0;
+int overflowValue = UnrealPackageIndex.DecodeCompactIndex(
+    new byte[] { 0x40, 0x80, 0x80, 0x80, 0x80 }, ref overflowCursor);
+Assert(overflowValue == 0 && overflowCursor == 5,
+    "Five-byte compact index did not preserve the client's 32-bit wrap semantics.");
 
 byte[] fixture = BuildFixture();
 var parsed = UnrealPackageIndex.Parse(fixture);
