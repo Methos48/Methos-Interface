@@ -155,7 +155,7 @@ internal sealed class MainForm : Form
         right.Controls.Add(new Label { Text = "REGISTRO DE ACTIVIDAD", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(104, 177, 255), Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
         split.Panel2.Controls.Add(right);
 
-        uViewPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(17, 23, 34) };
+        uViewPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(17, 23, 34), Visible = false };
         uViewPanel.Controls.Add(split);
         uViewPanel.Controls.Add(status);
         uViewPanel.Controls.Add(progress);
