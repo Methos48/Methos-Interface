@@ -5,6 +5,9 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 $size = 256
+if (-not ([System.Management.Automation.PSTypeName]'MethosNative.NativeMethods').Type) {
+    Add-Type -Namespace MethosNative -Name NativeMethods -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError=true)] public static extern bool DestroyIcon(System.IntPtr hIcon);'
+}
 $bitmap = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -42,7 +45,7 @@ try {
     try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose() }
 }
 finally {
-    [void][MethosNative]::DestroyIcon($handle)
+    [void][MethosNative.NativeMethods]::DestroyIcon($handle)
     $pen.Dispose(); $brush.Dispose(); $outer.Dispose(); $graphics.Dispose(); $bitmap.Dispose()
 }
 Write-Host "Icono Methos creado: $OutputPath"
