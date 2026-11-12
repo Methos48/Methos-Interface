@@ -42,6 +42,7 @@ internal sealed class MainForm : Form
     private readonly Button compile = new() { Text = "COMPILAR", Height = 48, Width = 170 };
     private readonly Panel xdatHostPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
     private Panel? uViewPanel;
+    private Panel? homePanel;
     private Process? xdatProcess;
     private IntPtr xdatWindow = IntPtr.Zero;
     private string XdatExePath => Path.Combine(AppRoot, "XDAT", "Methos XDAT.exe");
@@ -68,7 +69,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Methos - Archivos U";
+        Text = "Methos - Inicio";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = 980; Height = 700; MinimumSize = new Size(820, 560);
         StartPosition = FormStartPosition.CenterScreen;
@@ -86,41 +87,82 @@ internal sealed class MainForm : Form
 
     private void BuildLayout()
     {
-        var top = new Panel { Dock = DockStyle.Top, Height = 92, Padding = new Padding(18), BackColor = Color.FromArgb(32, 48, 68) };
-        var title = new Label { Text = "METHOS", ForeColor = Color.White, Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(18, 12) };
-        var subtitle = new Label { Text = "Herramientas de paquetes Lineage II Interlude", ForeColor = Color.Gainsboro, Font = new Font("Segoe UI", 9), AutoSize = true, Location = new Point(20, 52) };
-        var navigation = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 310, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 14, 0, 0), BackColor = Color.Transparent };
-        var openXdatView = new Button { Text = "ARCHIVOS XDAT", Width = 140, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.White };
-        var openUView = new Button { Text = "ARCHIVOS U", Width = 130, Height = 44, Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.LightSteelBlue };
-        navigation.Controls.Add(openXdatView);
-        navigation.Controls.Add(openUView);
+        Font titleFont = new("Segoe UI", 19, FontStyle.Bold);
+        Font subFont = new("Segoe UI", 9, FontStyle.Regular);
+        Color red = Color.FromArgb(190, 35, 48);
+        Color redDark = Color.FromArgb(105, 18, 30);
+        Color blue = Color.FromArgb(35, 112, 190);
+        Color blueDark = Color.FromArgb(18, 48, 92);
+        Color ink = Color.FromArgb(232, 238, 248);
+
+        var top = new Panel { Dock = DockStyle.Top, Height = 96, Padding = new Padding(22, 14, 22, 12), BackColor = Color.FromArgb(15, 20, 31) };
+        var title = new Label { Text = "METHOS", ForeColor = Color.White, Font = titleFont, AutoSize = true, Location = new Point(22, 10) };
+        var subtitle = new Label { Text = "L2 INTERFACE EDITOR  •  LINEAGE II INTERLUDE", ForeColor = Color.FromArgb(165, 178, 199), Font = subFont, AutoSize = true, Location = new Point(25, 57) };
+        var homeButton = new Button { Text = "INICIO", Width = 92, Height = 38, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(35, 43, 59), ForeColor = Color.White, Font = new Font("Segoe UI", 9, FontStyle.Bold), Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(Width - 140, 28) };
+        homeButton.FlatAppearance.BorderColor = Color.FromArgb(76, 89, 111);
         top.Controls.Add(title);
         top.Controls.Add(subtitle);
-        top.Controls.Add(navigation);
+        top.Controls.Add(homeButton);
 
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(12), BackColor = Color.White };
-        
+        homePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 14, 23), Padding = new Padding(24) };
+        var intro = new Label { Text = "CENTRO DE HERRAMIENTAS", Dock = DockStyle.Top, Height = 58, ForeColor = Color.White, Font = new Font("Segoe UI", 15, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter };
+        var introSub = new Label { Text = "Selecciona el tipo de archivo con el que quieres trabajar", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(155, 168, 190), Font = subFont, TextAlign = ContentAlignment.TopCenter };
+        var cards = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 20, 0, 16), BackColor = Color.Transparent };
+        cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+
+        Panel MakeModuleCard(string heading, string description, string details, Color accent, Color deep, string buttonText)
+        {
+            var card = new Panel { Dock = DockStyle.Fill, BackColor = deep, Padding = new Padding(24), Margin = new Padding(12) };
+            var stripe = new Panel { Dock = DockStyle.Top, Height = 7, BackColor = accent };
+            var name = new Label { Text = heading, Dock = DockStyle.Top, Height = 72, ForeColor = Color.White, Font = new Font("Segoe UI", 22, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+            var desc = new Label { Text = description, Dock = DockStyle.Top, Height = 62, ForeColor = ink, Font = new Font("Segoe UI", 11, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+            var info = new Label { Text = details, Dock = DockStyle.Top, Height = 90, ForeColor = Color.FromArgb(190, 201, 218), Font = new Font("Segoe UI", 9), TextAlign = ContentAlignment.TopLeft };
+            var open = new Button { Text = buttonText, Dock = DockStyle.Bottom, Height = 54, BackColor = accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10, FontStyle.Bold), Cursor = Cursors.Hand };
+            open.FlatAppearance.BorderSize = 0;
+            card.Controls.Add(open);
+            card.Controls.Add(info);
+            card.Controls.Add(desc);
+            card.Controls.Add(name);
+            card.Controls.Add(stripe);
+            return card;
+        }
+
+        var uCard = MakeModuleCard("ARCHIVOS U", "PAQUETES DE INTERFAZ", "Descompila y compila paquetes Unreal .u.\nImporta fuentes .uc y conserva copias de seguridad.", red, redDark, "ABRIR MÓDULO U");
+        var xCard = MakeModuleCard("ARCHIVOS XDAT", "CONFIGURACIÓN DE INTERFAZ", "Trabaja con archivos .xdat.\nDetecta métodos conocidos y verifica las reconstrucciones.", blue, blueDark, "ABRIR MÓDULO XDAT");
+        cards.Controls.Add(uCard, 0, 0);
+        cards.Controls.Add(xCard, 1, 0);
+        homePanel.Controls.Add(cards);
+        homePanel.Controls.Add(introSub);
+        homePanel.Controls.Add(intro);
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(12), BackColor = Color.FromArgb(25, 31, 44) };
         var openComplete = new Button { Text = "Abrir Comprimido", Width = 145, Height = 42 };
         var openParts = new Button { Text = "Abrir Descomprimido", Width = 155, Height = 42 };
         actions.Controls.AddRange(new Control[] { loadOriginal, decompile, loadSources, compile, openComplete, openParts });
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 430, Padding = new Padding(10) };
-        var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 430, Padding = new Padding(10), BackColor = Color.FromArgb(17, 23, 34) };
+        var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = Color.FromArgb(34, 20, 29) };
+        files.BackColor = Color.FromArgb(20, 23, 32);
+        files.ForeColor = Color.White;
         left.Controls.Add(files);
-        left.Controls.Add(new Label { Text = "ARCHIVOS .U", Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
+        left.Controls.Add(new Label { Text = "ARCHIVOS .U", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(255, 105, 115), Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
         split.Panel1.Controls.Add(left);
-        var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = Color.FromArgb(18, 29, 47) };
+        log.BackColor = Color.FromArgb(12, 19, 30);
+        log.ForeColor = Color.FromArgb(190, 211, 235);
         right.Controls.Add(log);
-        right.Controls.Add(new Label { Text = "REGISTRO DE ACTIVIDAD", Dock = DockStyle.Top, Height = 28, Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
+        right.Controls.Add(new Label { Text = "REGISTRO DE ACTIVIDAD", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(104, 177, 255), Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft });
         split.Panel2.Controls.Add(right);
 
-        uViewPanel = new Panel { Dock = DockStyle.Fill };
+        uViewPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(17, 23, 34) };
         uViewPanel.Controls.Add(split);
         uViewPanel.Controls.Add(status);
         uViewPanel.Controls.Add(progress);
         uViewPanel.Controls.Add(actions);
 
         xdatHostPanel.Visible = false;
+        xdatHostPanel.BackColor = Color.FromArgb(13, 24, 42);
         xdatHostPanel.Resize += (_, _) => ResizeXdatWindow();
         xdatHostPanel.Controls.Add(new Label
         {
@@ -129,12 +171,36 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleCenter,
             Font = new Font("Segoe UI", 15, FontStyle.Bold),
-            ForeColor = Color.FromArgb(32, 48, 68)
+            ForeColor = Color.FromArgb(104, 177, 255),
+            BackColor = Color.FromArgb(13, 24, 42)
         });
 
         Controls.Add(xdatHostPanel);
         Controls.Add(uViewPanel);
+        Controls.Add(homePanel);
         Controls.Add(top);
+
+        void OpenU()
+        {
+            homePanel.Visible = false;
+            uViewPanel.Visible = true;
+            _ = ShowUViewAsync();
+        }
+        void OpenXdat()
+        {
+            homePanel.Visible = false;
+            _ = ShowXdatViewAsync();
+        }
+        uCard.Controls.OfType<Button>().First().Click += (_, _) => OpenU();
+        xCard.Controls.OfType<Button>().First().Click += async (_, _) => OpenXdat();
+        homeButton.Click += (_, _) =>
+        {
+            StopXdatProcess();
+            uViewPanel.Visible = false;
+            xdatHostPanel.Visible = false;
+            homePanel.Visible = true;
+            Text = "Methos - Inicio";
+        };
 
         loadOriginal.Click += (_, _) => AddUPackages();
         loadSources.Click += (_, _) => ImportSourcesForSelectedPackage();
@@ -142,18 +208,6 @@ internal sealed class MainForm : Form
         openParts.Click += (_, _) => OpenFolder(PartsDir);
         decompile.Click += async (_, _) => await RunSelectedAsync(DecompileFile);
         compile.Click += async (_, _) => await RunSelectedAsync(CompileFolder);
-        openUView.Click += async (_, _) =>
-        {
-            openUView.BackColor = Color.LightSteelBlue;
-            openXdatView.BackColor = Color.White;
-            await ShowUViewAsync();
-        };
-        openXdatView.Click += async (_, _) =>
-        {
-            openXdatView.BackColor = Color.LightSteelBlue;
-            openUView.BackColor = Color.White;
-            await ShowXdatViewAsync();
-        };
         FormClosed += (_, _) => StopXdatProcess();
     }
 
