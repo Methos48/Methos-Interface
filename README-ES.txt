@@ -1,3 +1,17 @@
+ESTRUCTURA DE TRABAJO
+--------------------
+Methos crea junto al ejecutable una única carpeta "Compilados":
+
+Compilados/
+  U/
+    Archivo/       -> paquetes .u originales de trabajo y resultado compilado
+    Decopilado/    -> clases .uc extraídas y editables
+  XDAT/
+    Archivo/       -> archivos .xdat originales de trabajo y resultado compilado
+    Decopilado/    -> ventanas y accesos directos XML extraídos y editables
+
+El botón COMPILAR lee los archivos que estén guardados actualmente en Decopilado y reemplaza el archivo correspondiente dentro de Archivo. Antes de reemplazarlo, Methos conserva una copia de seguridad. El archivo que el usuario seleccionó fuera de Methos nunca se modifica.
+
 METHOS
 ================
 
