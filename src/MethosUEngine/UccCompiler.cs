@@ -34,12 +34,12 @@ public static class UccCompiler
     {
         changed = false;
         var declaration = Regex.Match(source,
-            @"(?ms)^[\\t ]*struct\\s+ChatFilterInfo\\s*\\{.*?^[\\t ]*\\};[\\t ]*\\r?\\n?");
+            @"(?ms)^[\t ]*struct\s+ChatFilterInfo\s*\{.*?^[\t ]*\};[\t ]*\r?\n?");
         if (!declaration.Success) return source;
 
         string structText = declaration.Value.Trim();
         source = source.Remove(declaration.Index, declaration.Length);
-        var classLine = Regex.Match(source, @"(?m)^\\s*class\\s+ChatWnd\\b[^;]*;[\\t ]*\\r?\\n?");
+        var classLine = Regex.Match(source, @"(?m)^\s*class\s+ChatWnd\b[^;]*;[\t ]*\r?\n?");
         if (!classLine.Success) return source.Insert(declaration.Index, declaration.Value);
 
         source = source.Insert(classLine.Index + classLine.Length, Environment.NewLine + structText + Environment.NewLine);
