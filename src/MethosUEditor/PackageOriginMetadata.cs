@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using MethosUEngine;
 
 namespace MethosUEditor;
 
@@ -14,7 +15,8 @@ internal static class PackageOriginMetadata
 
     public static string Save(string sourcePath, byte[] originalBytes, string outputDirectory,
         string fileKind, string detectionStatus, string? family, int? protocol,
-        string? header, string? detail, int? unrealVersion = null, int? licenseeVersion = null)
+        string? header, string? detail, int? unrealVersion = null, int? licenseeVersion = null,
+        ProtectionPipelineInspection? protection = null)
     {
         Directory.CreateDirectory(outputDirectory);
         string metadataDirectory = Path.Combine(outputDirectory, ".methos");
@@ -42,13 +44,47 @@ internal static class PackageOriginMetadata
                 original_filename_required = protocol == 121 || protocol == 821,
                 unreal_package_version = unrealVersion,
                 unreal_licensee_version = licenseeVersion,
-                diagnostic = detail,
-                reproducible = false,
-                reproducibility_note = "Perfil registrado; la recompilación debe verificar motor, protocolo y parámetros antes de codificar."
+                diagnostic = protection?.Plan.Explanation ?? detail,
+                reproducible = protection?.Plan.CanEncode ?? !protocol.HasValue,
+                reproducibility_note = protection is null
+                    ? "No se adjuntó una inspección de capas; la compilación debe volver a detectar y verificar el perfil original."
+                    : protection.Plan.CanEncode
+                        ? "Todas las capas detectadas tienen perfil original y superaron la prueba de ida y vuelta."
+                        : "El paquete puede inspeccionarse, pero Methos debe detener la compilación hasta recuperar un perfil de codificación verificable.",
+                layers = protection?.Plan.Layers.Select(layer => new
+                {
+                    kind = layer.Kind.ToString(),
+                    id = layer.Id,
+                    status = layer.Status,
+                    decode_available = layer.DecodeAvailable,
+                    encode_available = layer.EncodeAvailable,
+                    evidence = layer.Evidence
+                }).ToArray() ?? Array.Empty<object>(),
+                smartcrypt_profile = protection?.SmartCryptProfile is { } smart ? new
+                {
+                    marker_hex = Convert.ToHexString(smart.Marker),
+                    seed_block_hex = Convert.ToHexString(smart.SeedBlock),
+                    seed0 = smart.Seed0,
+                    seed1 = smart.Seed1,
+                    flag = smart.Flag,
+                    lineage2_version = smart.Lineage2Version,
+                    origin = smart.Origin
+                } : null,
+                lineage2_profile = protection?.Lineage2CustomTailProfile is { } l2 ? new
+                {
+                    header_hex = Convert.ToHexString(l2.Header),
+                    include_terminal_bytes_in_payload = l2.IncludeTailInPayload,
+                    terminal_bytes_hex = Convert.ToHexString(l2.Tail),
+                    origin = l2.Origin
+                } : null,
+                decoded_payload_sha256 = protection is null ? null :
+                    Convert.ToHexString(SHA256.HashData(protection.DecodedPayload))
             },
             security = new
             {
                 secrets_saved = false,
+                per_file_profile_saved = protection?.SmartCryptProfile is not null,
+                original_terminal_metadata_saved = protection?.Lineage2CustomTailProfile is not null,
                 original_file_preserved = true
             }
         };
