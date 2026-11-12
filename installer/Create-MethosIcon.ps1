@@ -50,6 +50,3 @@ finally {
 }
 Write-Host "Icono Methos creado: $OutputPath"
 
-if (-not ([System.Management.Automation.PSTypeName]'MethosNative').Type) {
-    Add-Type -Namespace MethosNative -Name NativeMethods -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError=true)] public static extern bool DestroyIcon(System.IntPtr hIcon);'
-}
