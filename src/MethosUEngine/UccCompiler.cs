@@ -152,11 +152,17 @@ public static class UccCompiler
         insertedClosures = 0;
         var output = new StringBuilder(source.Length + 256);
         int depth = 0;
+        int stateDepth = -1;
+        bool pendingStateOpen = false;
         bool inBlockComment = false;
 
         foreach (string line in source.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
-            if (Regex.IsMatch(line, @"^[\t ]*(?:(?:simulated|static|final|native|iterator|latent)\s+)*(?:function|event)\b",
+            bool stateDeclaration = depth == 0 &&
+                Regex.IsMatch(line, @"^\s*state\s+\w+\b", RegexOptions.IgnoreCase);
+
+            if (!stateDeclaration && stateDepth < 0 && !pendingStateOpen &&
+                Regex.IsMatch(line, @"^\s*(?:(?:simulated|static|final|native|iterator|latent)\s+)*(?:function|event)\b",
                     RegexOptions.IgnoreCase) && depth > 0)
             {
                 output.AppendLine(new string('}', depth));
@@ -164,24 +170,23 @@ public static class UccCompiler
                 depth = 0;
             }
 
-            bool inString = false;
-            for (int i = 0; i < line.Length; i++)
-            {
-                char ch = line[i];
-                char next = i + 1 < line.Length ? line[i + 1] : '\0';
-                if (inBlockComment)
-                {
-                    if (ch == '*' && next == '/') { inBlockComment = false; i++; }
-                    continue;
-                }
-                if (!inString && ch == '/' && next == '/') break;
-                if (!inString && ch == '/' && next == '*') { inBlockComment = true; i++; continue; }
-                if (ch == '"' && (i == 0 || line[i - 1] != '\\')) { inString = !inString; continue; }
-                if (inString) continue;
-                if (ch == '{') depth++;
-                else if (ch == '}') depth = Math.Max(0, depth - 1);
-            }
             output.AppendLine(line);
+            int delta = CountCodeBraces(line, ref inBlockComment);
+            depth += delta;
+
+            if (stateDeclaration)
+            {
+                if (delta > 0) stateDepth = depth;
+                else pendingStateOpen = true;
+            }
+            else if (pendingStateOpen && depth > 0)
+            {
+                stateDepth = depth;
+                pendingStateOpen = false;
+            }
+
+            if (stateDepth >= 0 && depth < stateDepth)
+                stateDepth = -1;
         }
 
         if (depth > 0)
