@@ -504,7 +504,7 @@ internal sealed class MainForm : Form
 
     private async Task RunSelectedAsync(Func<string, Task> action)
     {
-        if (files.SelectedIndices.Count == 0) { MessageBox.Show("Selecciona uno o más archivos .u de la lista."); return; }
+        if (files.SelectedIndices.Count != 1) { MessageBox.Show("Selecciona un único archivo .u para decopilar o recopilar. Methos mantiene un solo trabajo activo en las carpetas Decopilado y Archivo."); return; }
         var selected = files.SelectedIndices.Cast<int>().Where(i => i >= 0 && i < inputs.Count).Select(i => inputs[i]).ToList();
         SetBusy(true);
         var failures = new List<string>();
@@ -606,8 +606,9 @@ internal sealed class MainForm : Form
         Log($"Capas detectadas: {family}; estado={inspection.Plan.Status}; bytes descifrados={packageBytes.Length:N0}.");
         try
         {
+        ClearDirectoryContents(PartsDir);
         Directory.CreateDirectory(output);
-        Log($"Descompilando {Path.GetFileName(path)}...");
+        Log($"Decopilando {Path.GetFileName(path)}...");
         try
         {
             var index = UnrealPackageIndex.Parse(packageBytes);
@@ -1069,7 +1070,7 @@ internal sealed class MainForm : Form
                 File.WriteAllBytes(uccTemporaryOutput, finalBytes);
                 var destination = Path.Combine(CompleteDir, baseName + ".u");
                 SaveSourceSnapshot(baseName, uccResult.PackageBytes, sourceDirectory);
-                CopyWithBackup(uccTemporaryOutput, destination);
+                ReplaceArchiveWithCompiledFile(uccTemporaryOutput, CompleteDir, baseName + ".u");
                 Log($"Compilación UCC terminada: {ucFiles.Length} fuentes; {finalBytes.Length:N0} bytes; perfil={uccResult.ProfileDescription}; capas={protectionInspection?.Plan.Layers.Count ?? 0}; archivo={destination}");
             }
             finally
@@ -1186,7 +1187,7 @@ internal sealed class MainForm : Form
             File.WriteAllBytes(temporaryOutput, finalBytes);
             var destination = Path.Combine(CompleteDir, baseName + ".u");
             SaveSourceSnapshot(baseName, packageBytes, sourceDirectory);
-            CopyWithBackup(temporaryOutput, destination);
+            ReplaceArchiveWithCompiledFile(temporaryOutput, CompleteDir, baseName + ".u");
             Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}; bytes={finalBytes.Length:N0}. Archivo: {destination}");
         }
         finally
@@ -1251,6 +1252,38 @@ internal sealed class MainForm : Form
                 durableStream.Flush(flushToDisk: true);
             if (File.Exists(destination)) BackupExistingFile(destination);
             File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
+    }
+
+    private static void ClearDirectoryContents(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        foreach (string file in Directory.GetFiles(directory, "*", SearchOption.AllDirectories))
+            File.Delete(file);
+        foreach (string child in Directory.GetDirectories(directory).OrderByDescending(path => path.Length))
+            if (Directory.Exists(child)) Directory.Delete(child, recursive: true);
+    }
+
+    private static void ReplaceArchiveWithCompiledFile(string compiledFile, string archiveDirectory, string outputFileName)
+    {
+        Directory.CreateDirectory(archiveDirectory);
+        string[] existingFiles = Directory.GetFiles(archiveDirectory, "*", SearchOption.AllDirectories);
+        foreach (string existing in existingFiles)
+            BackupExistingFile(existing);
+        ClearDirectoryContents(archiveDirectory);
+
+        string destination = Path.Combine(archiveDirectory, outputFileName);
+        string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.Copy(compiledFile, temporary, overwrite: false);
+            using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                stream.Flush(flushToDisk: true);
+            File.Move(temporary, destination, overwrite: false);
         }
         finally
         {
