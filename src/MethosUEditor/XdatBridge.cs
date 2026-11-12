@@ -27,6 +27,7 @@ internal static class XdatBridge
             PythonEngine.PythonPath = string.Join(Path.PathSeparator,
                 stdlibZip, pythonRoot, runtimeRoot);
             PythonEngine.Initialize();
+            PythonEngine.BeginAllowThreads();
             initialized = true;
         }
     }
@@ -48,6 +49,13 @@ internal static class XdatBridge
                 foreach (PyObject argument in args) argument.Dispose();
             }
         }
+    }
+
+    public static void SelfTest()
+    {
+        string result = Invoke("self_test");
+        if (!string.Equals(result, "OK", StringComparison.Ordinal))
+            throw new InvalidOperationException("La prueba interna del motor XDAT no fue satisfactoria.");
     }
 
     public static (int Windows, int Shortcuts) Decompile(string sourcePath, string partsPath)
