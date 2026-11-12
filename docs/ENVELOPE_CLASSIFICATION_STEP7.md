@@ -188,3 +188,35 @@ Sources consulted:
 
 Status:
 Exact prefix not identified. SmartCrypt protection family strongly supported, exact client revision and envelope transformation still unproven.
+
+
+## Step 13 — exact DLL fingerprint correlation with a public client protection manifest
+
+Date: 2026-11-11
+
+A public Lineage II client-protection manifest was found containing MD5 fingerprints for Core.dll, npkscrypt.dll, interface.u, and interface.xdat.
+
+Exact cross-check against the binaries already supplied to this investigation:
+- The manifest's Core.dll MD5 is `B519540B5F7F5B9153263ECB492E88CC`, exactly matching the supplied Core.dll analyzed earlier.
+- The manifest's npkscrypt.dll MD5 is `5908C3EE24B40F6F08F1500723B1A41D`, exactly matching the supplied npkscrypt.dll analyzed earlier.
+- The same manifest enumerates interface.u and interface.xdat as protected client files and records multiple accepted MD5 values for each.
+
+This is a much stronger linkage than simply observing that the client contains files with familiar names: two exact binary fingerprints from our supplied client match a public protection manifest that also lists both interface assets under client integrity protection.
+
+Interpretation:
+- Strongly corroborates that the supplied client belongs to the same protection-module family/configuration represented by that manifest.
+- Supports SmartCrypt/SmartGuard as the leading explanation for the custom protection layer around the interface assets.
+- Does not by itself prove that the manifest's listed interface.u/xdat hashes equal our two samples; our sample hashes recorded in this project are SHA-256, and the manifest lists MD5 values. Do not claim exact sample identity without computing and comparing MD5 for the local samples.
+- Does not disclose the SmartCrypt cipher or custom key.
+
+Next exact verification:
+1. Compute MD5 for our existing interface.u and interface.xdat samples and compare against every manifest hash.
+2. If a match exists, establish exact client/sample lineage.
+3. Reproduce the supported extraction method on a disposable client copy and verify the output independently.
+4. Determine whether U has a second obfuscation layer after SmartCrypt, and test XDAT separately.
+
+Source:
+- https://maxcheaters.com/profile/235534-eusouomestredosmagos/
+
+Status update:
+The exact Core.dll and npkscrypt.dll fingerprint match is now confirmed from public evidence. SmartCrypt-family protection is strongly corroborated for this client environment. Exact interface sample hash match, the proprietary transform/key, and successful extraction remain outstanding.
