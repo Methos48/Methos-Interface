@@ -124,22 +124,26 @@ public static class UccCompiler
         return delta;
     }
 
-    // Some UELib decompilations preserve a local struct below the fields that use it.
-    // Interlude UCC resolves struct types in declaration order, so move this recovered
-    // ChatWnd-local struct above its first use in the staged copy.
+    // UELib can emit class-local structs after fields that already use them.
+    // Interlude UCC resolves struct types in declaration order, so move recovered
+    // struct declarations immediately after the class declaration in the staged copy.
     private static string NormalizeRecoveredStructOrder(string source, out bool changed)
     {
         changed = false;
-        var declaration = Regex.Match(source,
-            @"(?ms)^[\t ]*struct\s+ChatFilterInfo\s*\{.*?^[\t ]*\};[\t ]*\r?\n?");
-        if (!declaration.Success) return source;
+        MatchCollection matches = Regex.Matches(source,
+            @"(?ms)^[\t ]*struct\s+\w+\s*\{.*?^[\t ]*\};[\t ]*\r?\n?");
+        if (matches.Count == 0) return source;
 
-        string structText = declaration.Value.Trim();
-        source = source.Remove(declaration.Index, declaration.Length);
-        var classLine = Regex.Match(source, @"(?m)^\s*class\s+ChatWnd\b[^;]*;[\t ]*\r?\n?");
-        if (!classLine.Success) return source.Insert(declaration.Index, declaration.Value);
+        var declarations = matches.Cast<Match>().Select(match => match.Value.Trim()).ToArray();
+        for (int i = matches.Count - 1; i >= 0; i--)
+            source = source.Remove(matches[i].Index, matches[i].Length);
 
-        source = source.Insert(classLine.Index + classLine.Length, Environment.NewLine + structText + Environment.NewLine);
+        Match classLine = Regex.Match(source, @"(?m)^\s*class\s+\w+\b[^;]*;[\t ]*\r?\n?");
+        if (!classLine.Success) return source;
+
+        string structs = string.Join(Environment.NewLine + Environment.NewLine, declarations);
+        source = source.Insert(classLine.Index + classLine.Length,
+            Environment.NewLine + structs + Environment.NewLine);
         changed = true;
         return source;
     }
