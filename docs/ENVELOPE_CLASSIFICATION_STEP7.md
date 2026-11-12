@@ -220,3 +220,40 @@ Source:
 
 Status update:
 The exact Core.dll and npkscrypt.dll fingerprint match is now confirmed from public evidence. SmartCrypt-family protection is strongly corroborated for this client environment. Exact interface sample hash match, the proprietary transform/key, and successful extraction remain outstanding.
+
+
+## Step 14 — early SmartCrypt bypass source independently corroborated (2016)
+
+Date: 2026-11-12
+
+A 2016 public SmartCrypt discussion independently documents the same Core.dll file-manager technique later published as the 2021 Smart Crypt Decryptor guide.
+
+The 2016 report explicitly states:
+- SmartCrypt-protected client files are transparently decrypted when loaded through the engine's `appLoadFileToArray` API.
+- The resulting in-memory `TArray<BYTE>` is described as free of the SmartCrypt encryption layer.
+- The array can be written using `appSaveArrayToFile`.
+- The example targets Interlude and exports the decorated symbols:
+  - `?appLoadFileToArray@@YAHAAV?$TArray@E@@PBGPAVFFileManager@@@Z`
+  - `?appSaveArrayToFile@@YAHABV?$TArray@E@@PBGPAVFFileManager@@@Z`
+  - `?GFileManager@@3PAVFFileManager@@A`
+- The example attaches a DLL to the client executable and waits until `WinDrv.dll` is loaded before calling the file-manager functions.
+
+This is a direct explanation of how the old SmartCrypt layer can be removed without knowing its private cipher/key: use the client's own file loading path and save the post-protection byte array.
+
+Important limitation:
+- A December 2016 reply reports that the method had stopped working for that user's setup. Thus this is version/build dependent and cannot be assumed to work against the supplied L2Sudamerica client.
+- The method is specifically documented for early SmartCrypt revisions. The later 2021 guide calls it an early-revision decryptor.
+- It proves the extraction concept, not the exact algorithm or private key.
+- The published sample has minimal error handling and should not be copied into Methos as production code.
+
+Implications for our exact Core.dll:
+- The earlier static analysis of this supplied Core.dll established the native archive classes and codec machinery, but the report did not yet verify the three decorated file-manager exports above.
+- Their exact presence/signatures in our Core.dll are now the highest-priority static check.
+- If present, the next controlled test is to invoke the file manager against copies of interface.u and interface.xdat and inspect the resulting buffers; if absent or behavior differs, move to the SmartDecrypt ReadFile-capture route.
+
+Sources:
+- https://maxcheaters.com/topic/207068-smart-guards-smart-crypt-is-a-scam/
+- https://maxcheaters.com/topic/239616-smart-crypt-decryptor/
+
+Status:
+We now have two independent historical sources describing the same SmartCrypt transparent-decryption mechanism through Core.dll. Exact export availability and successful extraction in this L2Sudamerica build remain unverified.
