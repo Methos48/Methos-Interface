@@ -92,3 +92,37 @@ Sources:
 
 Status update:
 SmartCrypt is now the leading, evidence-supported hypothesis for this client's protection stack, not yet a proven identification for the exact uploaded bytes. The exact SmartCrypt cipher/key and successful decode of either sample remain unverified.
+
+
+## Step 10 — SmartDecrypt source semantics and capture limitations
+
+Date: 2026-11-11
+
+The publicly posted SmartDecrypt 1.5.2.2 source was inspected at the source-snippet level.
+
+Important finding:
+- SmartDecrypt is a runtime capture shim, not a standalone implementation of the SmartCrypt cipher.
+- It identifies the target file by intercepting `CreateFileW` and matching the name `SysString-e.dat`.
+- It hooks `ReadFile`, calls the original API, then writes the read buffer to `decrypted_file.txt`.
+- It forces the target through the game client's own loaded protection stack by arranging for SmartDecrypt's `load` import in `ogg.dll` to precede `npkscrypt`.
+- Therefore the published method extracts the byte stream visible at that runtime boundary; it does not disclose the SmartCrypt key schedule, cipher, or key derivation.
+
+Source-quality issues that Methos must not copy:
+- The sample writes `nNumberOfBytesToRead` rather than the actual `*lpNumberOfBytesRead`, so a short read can append uninitialized/stale bytes.
+- It does not correctly handle overlapped/asynchronous reads.
+- It does not validate API success before writing.
+- Its handle map and file-open checks are minimal.
+- The sample assumes sequential reads and a single output stream.
+
+Engineering consequence:
+- This source is useful as a reference for a controlled extraction experiment, but it is not suitable to ship unchanged in Methos.
+- A robust Methos capture harness would need to record successful byte counts, handle synchronous and overlapped completion correctly, preserve read order/offsets, and verify output length and hashes.
+- Most importantly, the capture point must be proven to contain the post-SmartCrypt stream. Import order alone is not proof of the exact hook chain or returned buffer semantics.
+
+Current evidence:
+- SmartCrypt remains the leading candidate for the outer protection layer.
+- The available public decryptor workflow demonstrates a practical route to ask the original client to expose file contents, but does not identify the proprietary algorithm.
+- No extracted post-SmartCrypt stream has yet been produced from our exact L2Sudamerica samples. No decoder is declared complete.
+
+Source:
+- https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/
