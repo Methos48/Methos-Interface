@@ -25,10 +25,10 @@ Source: "..\README-ES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
-Name: "{app}\Archivos U\Comprimido"
-Name: "{app}\Archivos U\Descomprimido"
-Name: "{app}\Archivos XDAT\Comprimido"
-Name: "{app}\Archivos XDAT\Descomprimido"
+Name: "{app}\Compilados\U\Archivo"
+Name: "{app}\Compilados\U\Decopilado"
+Name: "{app}\Compilados\XDAT\Archivo"
+Name: "{app}\Compilados\XDAT\Decopilado"
 
 [Icons]
 Name: "{autoprograms}\Methos"; Filename: "{app}\{#MyAppExeName}"
