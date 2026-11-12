@@ -60,3 +60,35 @@ Sources:
 Known public LameCrypt format: checked and incompatible with the observed leading bytes.
 SmartCrypt/private custom protector: still unconfirmed.
 Exact producer/tool and cipher for the uploaded samples: not identified.
+
+
+## Step 9 — SmartCrypt decryptor workflow cross-check
+
+Date: 2026-11-11
+
+New external evidence materially strengthens SmartCrypt as the leading candidate:
+
+- A Lineage II client-development discussion contains a developer's direct inspection of a pair of Interlude `interface.u` and `interface.xdat` samples and an explicit identification of those samples as SmartCrypt-protected. This is independent evidence that SmartCrypt is used on precisely these two file types in Interlude clients; it is not proof that our L2Sudamerica samples are the same protection build.
+- A separate Smart Decryptor 1.0.1 resource documents a reproducible runtime extraction workflow: build/load a 32-bit `SmartDecrypt.dll`, add its `load` import to `ogg.dll`, ensure the SmartDecrypt import is ordered before `npkscrypt`, rename the target file to `sysstring-e.dat`, then launch the client's `l2.exe`. The output is `decrypted_file.txt`.
+- The documented workflow explicitly warns that the resulting output may still carry ordinary Lineage II encryption (for example 413/111), which must be decoded as a separate second layer.
+- A 2024 Smart Crypt Decryptor discussion describes the same `ReadFile`/`CreateFileW` hook approach and import-order requirement.
+
+Relevance to this client:
+- Our supplied system archive contains `npkscrypt.dll` and `ogg.dll`; this matches the module pair required by the published SmartDecrypt workflow.
+- The samples' nonstandard six-byte prefix and the presence of this module pair are consistent with an outer SmartCrypt layer, but do not alone prove the exact protector or reveal its key.
+- The documented workflow is an extraction technique, not yet a confirmed Methos implementation. It relies on executing the target client and modifying a test copy of `ogg.dll`; no original files should be touched.
+
+Next verification required:
+1. Obtain and inspect the published SmartDecrypt source and establish exactly what bytes it captures and writes.
+2. Compare its hook semantics with the exact `ogg.dll` import table and `npkscrypt.dll` from this client.
+3. Reproduce the extraction only in an isolated disposable copy of the client, preserving hashes of all originals.
+4. Inspect the extracted output for a second standard Lineage2 header; decode that layer independently for U and XDAT.
+5. Validate the resulting U package and XDAT structure, then test a no-edit round trip before enabling editing.
+
+Sources:
+- https://maxcheaters.com/topic/245142-decrypt-interfaceuxdat-interlude/
+- https://mmo-dev.info/resources/smart-decryptor.3096/
+- https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/
+
+Status update:
+SmartCrypt is now the leading, evidence-supported hypothesis for this client's protection stack, not yet a proven identification for the exact uploaded bytes. The exact SmartCrypt cipher/key and successful decode of either sample remain unverified.
