@@ -266,18 +266,19 @@ jobs:
           foreach ($requiredClass in @("UICommonAPI.uc", "AutoBuffWnd.uc", "AutoPotionsWnd.uc", "AutoSkillWnd.uc")) {
             if (!(Test-Path (Join-Path $reference $requiredClass))) { throw "Falta la fuente de referencia requerida: $requiredClass." }
           }
-          $xdatExe = Join-Path $installDir "XDAT\\Methos XDAT.exe"
-          if (!(Test-Path $xdatExe)) { throw "El instalador no incluyó el módulo XDAT." }
-          $xdatEngine = Get-ChildItem -LiteralPath (Join-Path $installDir "XDAT") -Recurse -File -Filter "l2encdec.exe" | Select-Object -First 1
-          if (!$xdatEngine) { throw "El instalador no incluyó el motor de cifrado XDAT dentro del módulo." }
-          Write-Host "Motor XDAT encontrado en: $($xdatEngine.FullName)"
-
-          $xdatProcess = Start-Process -FilePath $xdatExe -WorkingDirectory (Split-Path $xdatExe) -PassThru
-          Start-Sleep -Seconds 8
-          $xdatProcess.Refresh()
-          if ($xdatProcess.HasExited) { throw "El módulo XDAT se cerró durante la prueba de arranque (código $($xdatProcess.ExitCode))." }
-          Stop-Process -Id $xdatProcess.Id -Force
-          Write-Host "SMOKE TEST XDAT OK: ejecutable y motor integrados."
+          $xdatRuntime = Join-Path $installDir "XdatRuntime"
+          $pythonRuntime = Join-Path $xdatRuntime "Python"
+          foreach ($required in @("python312.dll", "python312.zip")) {
+            if (!(Test-Path (Join-Path $pythonRuntime $required))) { throw "Falta el runtime embebido XDAT: $required." }
+          }
+          foreach ($required in @("xdat_core.py", "xdat_bridge.py")) {
+            if (!(Test-Path (Join-Path $xdatRuntime $required))) { throw "Falta el motor XDAT integrado: $required." }
+          }
+          $secondApp = Get-ChildItem -LiteralPath $installDir -Recurse -File -Filter "Methos XDAT.exe"
+          if ($secondApp) { throw "La instalación contiene una segunda aplicación Methos XDAT.exe; no cumple el diseño de aplicación única." }
+          $cryptoExe = Get-ChildItem -LiteralPath $installDir -Recurse -File -Filter "l2encdec.exe"
+          if ($cryptoExe) { throw "Se detectó l2encdec.exe como ejecutable externo; el paquete no debe depender de ese programa." }
+          Write-Host "SMOKE TEST XDAT OK: el motor Python está integrado como runtime interno y no hay segundo ejecutable de aplicación."
 
           $workRoot = Join-Path $installDir "Compilados"
           foreach ($relative in @("U\\Archivo", "U\\Decopilado", "XDAT\\Archivo", "XDAT\\Decopilado")) {
