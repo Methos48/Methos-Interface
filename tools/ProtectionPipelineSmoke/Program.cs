@@ -6,9 +6,9 @@ static void Check(bool value, string message)
     if (!value) throw new Exception(message);
 }
 
-byte[] smartSample = Convert.FromHexString("FFEDFACE0100") .Concat(new byte[32]).ToArray();
+byte[] smartSample = Convert.FromHexString("FFEDFACE").Concat(new byte[0x400 - 4]).ToArray();
 var smart = ProtectionPipelinePlanner.Inspect(smartSample, "interface.u");
-Check(smart.Status == "recognized-candidate" && !smart.CanDecode && !smart.CanEncode,
+Check(smart.Status == "recognized-key-required" && !smart.CanDecode && !smart.CanEncode,
     "SmartCrypt sample must be identified as a candidate, never falsely reported as decrypted.");
 
 byte[] l2 = Encoding.Unicode.GetBytes("Lineage2Ver413");
