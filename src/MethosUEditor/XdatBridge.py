@@ -38,3 +38,11 @@ def compile_file(parts_path, original_path, temporary_output_path):
         temporary.unlink(missing_ok=True)
         raise ValueError("La verificación del archivo temporal falló.")
     return f"{windows}|{shortcuts}|{len(data)}"
+
+
+def self_test():
+    from xdat_core import Reader, put_compact
+    probe = 413
+    if Reader(put_compact(probe)).compact() != probe:
+        raise RuntimeError('Falló la prueba interna del códec XDAT.')
+    return 'OK'
