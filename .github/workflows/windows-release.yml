@@ -204,6 +204,12 @@ jobs:
           $project = Get-ChildItem $extract -Directory | Select-Object -First 1
           if (!$project) { throw "El kit XDAT no contiene la carpeta del proyecto." }
 
+          Write-Host "===== METHOS XDAT CORE SOURCE BEGIN ====="
+          Get-Content (Join-Path $project.FullName "xdat_core.py") -Raw
+          Write-Host "===== METHOS XDAT CORE SOURCE END ====="
+          Write-Host "===== METHOS XDAT DEPENDENCIES ====="
+          Get-Content (Join-Path $project.FullName "requirements-build.txt") -Raw
+
           python "$xdatRepo\\apply_detection_layer.py" "$($project.FullName)"
           if ($LASTEXITCODE -ne 0) { throw "Falló la capa de detección XDAT." }
           python "$xdatRepo\\auto_pipeline_overlay.py" "$($project.FullName)"
