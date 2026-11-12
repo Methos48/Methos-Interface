@@ -349,18 +349,53 @@ internal sealed class MainForm : Form
         }
         decompileButton.Enabled = compileButton.Enabled = false;
         UseWaitCursor = true;
+        string? decodedPath = null;
         try
         {
-            SetXdatStatus($"Descompilando {Path.GetFileName(source)}...");
-            LogXdat($"Iniciando descompilación: {Path.GetFileName(source)}");
+            SetXdatStatus($"Analizando {Path.GetFileName(source)}...");
+            LogXdat($"Analizando protección y estructura: {Path.GetFileName(source)}");
             var result = await Task.Run(() =>
             {
-                ClearDirectoryContents(XdatPartsDir);
-                return XdatBridge.Decompile(source, XdatPartsDir);
+                byte[] original = File.ReadAllBytes(source);
+                var inspection = ProtectionPipelinePlanner.InspectFullPipeline(original, source);
+                if (!inspection.IsPlaintextCandidate || !inspection.Plan.CanDecode ||
+                    (inspection.Plan.Layers.Count > 0 && !inspection.Plan.CanEncode))
+                    throw new InvalidDataException(
+                        $"No se puede reconstruir con seguridad la protección detectada. Estado: {inspection.Plan.Status}. {inspection.Plan.Explanation}");
+
+                byte[] plain = original;
+                string family = inspection.Plan.Layers.Count == 0
+                    ? "sin cifrado"
+                    : string.Join(" + ", inspection.Plan.Layers.Select(layer => layer.Id));
+                if (inspection.Plan.Layers.Count > 0)
+                {
+                    var codec = ProtectionCodecRuntime.CreateDefault(
+                        smartCryptProfile: inspection.SmartCryptProfile,
+                        lineage2CustomTailProfile: inspection.Lineage2CustomTailProfile);
+                    plain = codec.Decode(inspection.Plan, original, Path.GetFileName(source));
+                    byte[] rebuilt = codec.Encode(inspection.Plan, plain, Path.GetFileName(source));
+                    if (!rebuilt.AsSpan().SequenceEqual(original))
+                        throw new InvalidDataException("La protección XDAT no pudo reconstruirse byte por byte. El original quedó intacto.");
+                }
+
+                string decoded = Path.Combine(Path.GetTempPath(), "MethosXDAT_" + Guid.NewGuid().ToString("N") + ".xdat");
+                File.WriteAllBytes(decoded, plain);
+                try
+                {
+                    ClearDirectoryContents(XdatPartsDir);
+                    var counts = XdatBridge.Decompile(decoded, XdatPartsDir);
+                    return (counts.Windows, counts.Shortcuts, family, decoded);
+                }
+                catch
+                {
+                    if (File.Exists(decoded)) File.Delete(decoded);
+                    throw;
+                }
             });
-            LogXdat($"Descompilación verificada: {result.Windows} ventanas y {result.Shortcuts} accesos directos.");
+            decodedPath = result.Item4;
+            LogXdat($"Protección reconocida: {result.family}. Descompilación verificada: {result.Windows} ventanas y {result.Shortcuts} accesos directos.");
             SetXdatStatus($"Descompilación terminada: {result.Windows} ventanas · {result.Shortcuts} accesos directos.");
-            MessageBox.Show($"Descompilación terminada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\n\nLos XML están en Compilados\\XDAT\\Decopilado.",
+            MessageBox.Show($"Descompilación terminada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\nProtección: {result.family}\n\nLos XML están en Compilados\\XDAT\\Decopilado.",
                 "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
@@ -370,7 +405,12 @@ internal sealed class MainForm : Form
             MessageBox.Show(ex.GetBaseException().Message, "Error al descompilar XDAT",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { decompileButton.Enabled = compileButton.Enabled = true; UseWaitCursor = false; }
+        finally
+        {
+            if (decodedPath is not null && File.Exists(decodedPath)) File.Delete(decodedPath);
+            decompileButton.Enabled = compileButton.Enabled = true;
+            UseWaitCursor = false;
+        }
     }
 
     private async Task RunXdatCompileAsync(Button decompileButton, Button compileButton)
@@ -393,21 +433,71 @@ internal sealed class MainForm : Form
 
         string temporary = Path.Combine(XdatCompleteDir, "." + Path.GetFileName(source) + "." +
             Guid.NewGuid().ToString("N") + ".tmp");
+        string? decodedOriginal = null;
         decompileButton.Enabled = compileButton.Enabled = false;
         UseWaitCursor = true;
         try
         {
             SetXdatStatus($"Compilando {xmlCount} archivos XML...");
             LogXdat($"Compilando desde el contenido actual de Decopilado: {xmlCount} XML.");
-            var result = await Task.Run(() => XdatBridge.Compile(XdatPartsDir, source, temporary));
+            var result = await Task.Run(() =>
+            {
+                byte[] original = File.ReadAllBytes(source);
+                var inspection = ProtectionPipelinePlanner.InspectFullPipeline(original, source);
+                if (!inspection.IsPlaintextCandidate || !inspection.Plan.CanDecode ||
+                    (inspection.Plan.Layers.Count > 0 && !inspection.Plan.CanEncode))
+                    throw new InvalidDataException(
+                        $"No se puede reconstruir con seguridad la protección detectada. Estado: {inspection.Plan.Status}. {inspection.Plan.Explanation}");
+
+                byte[] plainOriginal = original;
+                var codec = inspection.Plan.Layers.Count == 0 ? null : ProtectionCodecRuntime.CreateDefault(
+                    smartCryptProfile: inspection.SmartCryptProfile,
+                    lineage2CustomTailProfile: inspection.Lineage2CustomTailProfile);
+                string family = inspection.Plan.Layers.Count == 0
+                    ? "sin cifrado"
+                    : string.Join(" + ", inspection.Plan.Layers.Select(layer => layer.Id));
+                if (codec is not null)
+                {
+                    plainOriginal = codec.Decode(inspection.Plan, original, Path.GetFileName(source));
+                    byte[] rebuiltOriginal = codec.Encode(inspection.Plan, plainOriginal, Path.GetFileName(source));
+                    if (!rebuiltOriginal.AsSpan().SequenceEqual(original))
+                        throw new InvalidDataException("No se pudo verificar la protección del XDAT original.");
+                }
+
+                string plainPath = Path.Combine(Path.GetTempPath(), "MethosXDAT_Original_" + Guid.NewGuid().ToString("N") + ".xdat");
+                File.WriteAllBytes(plainPath, plainOriginal);
+                try
+                {
+                    var counts = XdatBridge.Compile(XdatPartsDir, plainPath, temporary);
+                    byte[] compiledPlain = File.ReadAllBytes(temporary);
+                    byte[] finalBytes = codec is null
+                        ? compiledPlain
+                        : codec.Encode(inspection.Plan, compiledPlain, Path.GetFileName(source));
+                    if (codec is not null)
+                    {
+                        byte[] verification = codec.Decode(inspection.Plan, finalBytes, Path.GetFileName(source));
+                        if (!verification.AsSpan().SequenceEqual(compiledPlain))
+                            throw new InvalidDataException("La recompilación cifrada no superó la verificación de ida y vuelta.");
+                    }
+                    File.WriteAllBytes(temporary, finalBytes);
+                    return (counts.Windows, counts.Shortcuts, counts.Bytes, family, plainPath);
+                }
+                catch
+                {
+                    if (File.Exists(plainPath)) File.Delete(plainPath);
+                    throw;
+                }
+            });
+            decodedOriginal = result.Item5;
             BackupXdatFile(source);
             File.Move(temporary, source, overwrite: true);
             RefreshXdatInputs();
             int selected = xdatFiles.Items.IndexOf(Path.GetFileName(source));
             if (selected >= 0) xdatFiles.SelectedIndex = selected;
-            LogXdat($"Compilación verificada: {result.Windows} ventanas, {result.Shortcuts} accesos directos, {result.Bytes:N0} bytes.");
-            SetXdatStatus($"Compilación terminada: {result.Bytes:N0} bytes. El original anterior quedó respaldado.");
-            MessageBox.Show($"Compilación terminada y validada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\nTamaño: {result.Bytes:N0} bytes\n\nSe creó una copia de seguridad del archivo anterior. Los XML modificados se conservaron.",
+            long finalSize = new FileInfo(source).Length;
+            LogXdat($"Compilación verificada: {result.Windows} ventanas, {result.Shortcuts} accesos directos; protección={result.family}; {finalSize:N0} bytes.");
+            SetXdatStatus($"Compilación terminada: {finalSize:N0} bytes. El original anterior quedó respaldado.");
+            MessageBox.Show($"Compilación terminada y validada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\nProtección: {result.family}\nTamaño: {finalSize:N0} bytes\n\nSe creó una copia de seguridad del archivo anterior. Los XML modificados se conservaron.",
                 "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
@@ -418,7 +508,12 @@ internal sealed class MainForm : Form
             MessageBox.Show(ex.GetBaseException().Message, "Error al compilar XDAT",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { decompileButton.Enabled = compileButton.Enabled = true; UseWaitCursor = false; }
+        finally
+        {
+            if (decodedOriginal is not null && File.Exists(decodedOriginal)) File.Delete(decodedOriginal);
+            decompileButton.Enabled = compileButton.Enabled = true;
+            UseWaitCursor = false;
+        }
     }
 
     private static void BackupXdatFile(string path)
