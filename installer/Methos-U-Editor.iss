@@ -32,7 +32,7 @@ Name: "{app}\Archivos XDAT\Descomprimido"
 
 [Icons]
 Name: "{autoprograms}\Methos"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\Methos"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\Methos"; Filename: "{app}\{#MyAppExeName}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Abrir Methos"; Flags: postinstall nowait skipifsilent
