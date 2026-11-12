@@ -27,6 +27,90 @@ public static class UccCompiler
             ['\u001D'] = "MethosRecoveredFunction_29"
         };
 
+    // UELib can emit a class-scope prototype for a function whose actual implementation
+    // belongs to a state. Interlude UCC treats that pair as a conflicting declaration.
+    // Remove only those redundant class-scope prototypes from the temporary staging copy;
+    // the state implementation and all call sites remain unchanged.
+    private static string NormalizeRecoveredStateFunctionPrototypes(string source, out int removed)
+    {
+        removed = 0;
+        string[] lines = source.Replace("\\r\\n", "\\n").Replace('\\r', '\\n').Split('\\n');
+        var stateFunctionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int braceDepth = 0;
+        int activeStateDepth = -1;
+        bool inBlockComment = false;
+
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        {
+            string line = lines[lineIndex];
+            if (activeStateDepth < 0 && braceDepth == 0 &&
+                Regex.IsMatch(line, @"^\\s*state\\s+\\w+\\b.*\\{", RegexOptions.IgnoreCase))
+            {
+                activeStateDepth = braceDepth + CountCodeBraces(line, ref inBlockComment);
+                continue;
+            }
+
+            if (activeStateDepth >= 0)
+            {
+                Match function = Regex.Match(line,
+                    @"^\\s*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\s+(?:(?:coerce|optional)\\s+)*(?:\\w+\\s+)?(?<name>\\w+)\\s*\\(",
+                    RegexOptions.IgnoreCase);
+                if (function.Success)
+                    stateFunctionNames.Add(function.Groups["name"].Value);
+            }
+
+            int delta = CountCodeBraces(line, ref inBlockComment);
+            braceDepth += delta;
+            if (activeStateDepth >= 0 && braceDepth < activeStateDepth)
+                activeStateDepth = -1;
+        }
+
+        if (stateFunctionNames.Count == 0) return source;
+
+        var output = new StringBuilder(source.Length);
+        braceDepth = 0;
+        inBlockComment = false;
+        foreach (string line in lines)
+        {
+            Match prototype = Regex.Match(line,
+                @"^\\s*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\s+(?:(?:coerce|optional)\\s+)*(?:\\w+\\s+)?(?<name>\\w+)\\s*\\([^;]*\\)\\s*;\\s*$",
+                RegexOptions.IgnoreCase);
+            if (braceDepth == 0 && prototype.Success &&
+                stateFunctionNames.Contains(prototype.Groups["name"].Value))
+            {
+                removed++;
+                continue;
+            }
+
+            output.AppendLine(line);
+            braceDepth += CountCodeBraces(line, ref inBlockComment);
+        }
+        return output.ToString();
+    }
+
+    private static int CountCodeBraces(string line, ref bool inBlockComment)
+    {
+        int delta = 0;
+        bool inString = false;
+        for (int i = 0; i < line.Length; i++)
+        {
+            char ch = line[i];
+            char next = i + 1 < line.Length ? line[i + 1] : '\\0';
+            if (inBlockComment)
+            {
+                if (ch == '*' && next == '/') { inBlockComment = false; i++; }
+                continue;
+            }
+            if (!inString && ch == '/' && next == '/') break;
+            if (!inString && ch == '/' && next == '*') { inBlockComment = true; i++; continue; }
+            if (ch == '"' && (i == 0 || line[i - 1] != '\\\\')) { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch == '{') delta++;
+            else if (ch == '}') delta--;
+        }
+        return delta;
+    }
+
     // Some UELib decompilations preserve a local struct below the fields that use it.
     // Interlude UCC resolves struct types in declaration order, so move this recovered
     // ChatWnd-local struct above its first use in the staged copy.
@@ -163,6 +247,8 @@ public static class UccCompiler
                     source = NormalizeRecoveredStructOrder(source, out bool movedStruct);
                     if (movedStruct) repairedIdentifiers++;
                 }
+                source = NormalizeRecoveredStateFunctionPrototypes(source, out int removedStatePrototypes);
+                repairedIdentifiers += removedStatePrototypes;
                 source = NormalizeRecoveredFunctionBlocks(source, out int insertedClosures);
                 repairedIdentifiers += insertedClosures;
                 File.WriteAllText(Path.Combine(stagedClasses, Path.GetFileName(file)), source, new UTF8Encoding(false));
