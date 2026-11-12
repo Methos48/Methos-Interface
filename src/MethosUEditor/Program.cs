@@ -981,10 +981,13 @@ internal sealed class MainForm : Form
                     Log($"Validación UCC: {classCount} clases; names={verifiedUcc.Names.Count}; imports={verifiedUcc.Imports.Count}; exports={verifiedUcc.Exports.Count}.");
                 }
 
+                byte[] finalBytes = EncodeCompiledPackage(
+                    uccResult.PackageBytes, protectionInspection, protectionRuntime, originalFileName);
+                File.WriteAllBytes(uccTemporaryOutput, finalBytes);
                 var destination = Path.Combine(CompleteDir, baseName + ".u");
                 SaveSourceSnapshot(baseName, uccResult.PackageBytes, sourceDirectory);
                 CopyWithBackup(uccTemporaryOutput, destination);
-                Log($"Compilación UCC terminada: {ucFiles.Length} fuentes; {uccResult.PackageBytes.Length:N0} bytes; perfil={uccResult.ProfileDescription}; archivo={destination}");
+                Log($"Compilación UCC terminada: {ucFiles.Length} fuentes; {finalBytes.Length:N0} bytes; perfil={uccResult.ProfileDescription}; capas={protectionInspection?.Plan.Layers.Count ?? 0}; archivo={destination}");
             }
             finally
             {
