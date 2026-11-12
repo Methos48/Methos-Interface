@@ -1280,8 +1280,12 @@ internal sealed class MainForm : Form
         Directory.CreateDirectory(archiveDirectory);
         string archiveParent = Directory.GetParent(Path.GetFullPath(archiveDirectory))!.FullName;
         Directory.CreateDirectory(archiveParent);
-        string staged = Path.Combine(archiveParent, "." + outputFileName + "." + Guid.NewGuid().ToString("N") + ".staged");
+        string transactionId = Guid.NewGuid().ToString("N");
+        string staged = Path.Combine(archiveParent, "." + outputFileName + "." + transactionId + ".staged");
+        string rollback = Path.Combine(archiveParent, "." + Path.GetFileName(archiveDirectory) + "." + transactionId + ".rollback");
         string destination = Path.Combine(archiveDirectory, outputFileName);
+        bool archiveCleared = false;
+        bool rollbackCanBeDeleted = true;
 
         try
         {
@@ -1296,22 +1300,55 @@ internal sealed class MainForm : Form
             foreach (string existing in existingFiles)
                 BackupExistingFile(existing);
 
+            // Segunda copia independiente para poder restaurar Archivo si la publicación falla.
+            Directory.CreateDirectory(rollback);
+            foreach (string existing in existingFiles)
+            {
+                string relative = Path.GetRelativePath(archiveDirectory, existing);
+                string backup = Path.Combine(rollback, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(backup)!);
+                File.Copy(existing, backup, overwrite: false);
+                if (new FileInfo(backup).Length != new FileInfo(existing).Length)
+                    throw new IOException($"La copia de recuperación no coincide: {relative}");
+            }
+
             ClearDirectoryContents(archiveDirectory);
-            try
+            archiveCleared = true;
+            File.Move(staged, destination, overwrite: false);
+            if (new FileInfo(destination).Length != info.Length)
+                throw new IOException("El paquete publicado no coincide con el compilado validado.");
+        }
+        catch (Exception publishError)
+        {
+            if (archiveCleared)
             {
-                File.Move(staged, destination, overwrite: false);
+                try
+                {
+                    ClearDirectoryContents(archiveDirectory);
+                    foreach (string backup in Directory.GetFiles(rollback, "*", SearchOption.AllDirectories))
+                    {
+                        string relative = Path.GetRelativePath(rollback, backup);
+                        string restored = Path.Combine(archiveDirectory, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(restored)!);
+                        File.Copy(backup, restored, overwrite: false);
+                    }
+                }
+                catch (Exception restoreError)
+                {
+                    rollbackCanBeDeleted = false;
+                    throw new AggregateException(
+                        "Falló la publicación del paquete y también la restauración automática. " +
+                        "La copia de recuperación se conserva en: " + rollback,
+                        publishError, restoreError);
+                }
             }
-            catch
-            {
-                // Si el movimiento falla, recuperar el paquete compilado desde el staging validado.
-                if (!File.Exists(destination) && File.Exists(staged))
-                    File.Copy(staged, destination, overwrite: false);
-                throw;
-            }
+            throw;
         }
         finally
         {
             if (File.Exists(staged)) File.Delete(staged);
+            if (rollbackCanBeDeleted && Directory.Exists(rollback))
+                Directory.Delete(rollback, recursive: true);
         }
     }
 
