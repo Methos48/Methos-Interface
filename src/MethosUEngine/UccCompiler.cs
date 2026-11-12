@@ -264,11 +264,8 @@ public static class UccCompiler
                         repairedIdentifiers += count;
                     }
                 }
-                if (Path.GetFileName(file).Equals("ChatWnd.uc", StringComparison.OrdinalIgnoreCase))
-                {
-                    source = NormalizeRecoveredStructOrder(source, out bool movedStruct);
-                    if (movedStruct) repairedIdentifiers++;
-                }
+                source = NormalizeRecoveredStructOrder(source, out bool movedStruct);
+                if (movedStruct) repairedIdentifiers++;
                 source = NormalizeRecoveredStateFunctionPrototypes(source, out int removedStatePrototypes);
                 repairedIdentifiers += removedStatePrototypes;
                 source = NormalizeRecoveredFunctionBlocks(source, out int insertedClosures);
