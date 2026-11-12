@@ -279,6 +279,9 @@ jobs:
           $ucc = Join-Path $system "ucc.exe"
           $reference = Join-Path $installDir "UccRuntime\Interlude\Interface\Classes"
           if (!(Test-Path $app)) { throw "El instalador no colocó la aplicación." }
+          $xdatSelfTest = Start-Process -FilePath $app -ArgumentList "--xdat-self-test" -Wait -PassThru
+          if ($xdatSelfTest.ExitCode -ne 0) { throw "Methos.exe no pudo inicializar su motor XDAT embebido (código $($xdatSelfTest.ExitCode))." }
+          Write-Host "SMOKE TEST XDAT IN-PROCESS OK: Python.NET cargó el motor dentro de Methos.exe."
           foreach ($required in @("ucc.exe", "UIScript.ini", "Core.u", "Engine.u", "NWindow.u")) {
             if (!(Test-Path (Join-Path $system $required))) { throw "Falta el componente UCC requerido: $required." }
           }
