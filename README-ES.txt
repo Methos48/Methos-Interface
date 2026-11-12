@@ -1,79 +1,114 @@
+METHOS
+================
+Editor unificado para paquetes de interfaz de Lineage II Interlude (.u y .xdat).
+
+INSTALACIÓN
+-----------
+El proyecto genera un único instalador de Windows x64: Methos-Setup.exe.
+Instala la aplicación principal, el módulo XDAT integrado en la ventana de Methos,
+el runtime UCC de Interlude y los componentes necesarios. No hace falta instalar
+.NET, Python ni UCC por separado.
+
+INTERFAZ
+--------
+Al abrir Methos se muestran dos módulos:
+- ARCHIVOS U: descompilar y compilar paquetes Unreal .u.
+- ARCHIVOS XDAT: trabajar con archivos .xdat desde la misma ventana principal.
+
 ESTRUCTURA DE TRABAJO
---------------------
-Methos crea junto al ejecutable una única carpeta "Compilados":
+---------------------
+Methos crea junto al ejecutable esta estructura:
 
 Compilados/
   U/
-    Archivo/       -> paquetes .u originales de trabajo y resultado compilado
-    Decopilado/    -> clases .uc extraídas y editables
+    Archivo/       -> paquetes .u importados y paquete compilado actual
+    Decopilado/    -> fuentes .uc extraídas y editables
   XDAT/
-    Archivo/       -> archivos .xdat originales de trabajo y resultado compilado
+    Archivo/       -> archivos .xdat importados y paquete compilado actual
     Decopilado/    -> ventanas y accesos directos XML extraídos y editables
 
-El botón COMPILAR lee los archivos que estén guardados actualmente en Decopilado y reemplaza el archivo correspondiente dentro de Archivo. Antes de reemplazarlo, Methos conserva una copia de seguridad. El archivo que el usuario seleccionó fuera de Methos nunca se modifica.
+FLUJO DE TRABAJO
+----------------
+1. IMPORTAR
+   - En ARCHIVOS U, pulsa CARGAR ARCHIVO y selecciona el .u.
+   - En ARCHIVOS XDAT, importa el .xdat desde su módulo.
+   - Methos copia el archivo a Compilados/U/Archivo o Compilados/XDAT/Archivo.
+     El archivo que seleccionaste en su ubicación original no se modifica.
 
-METHOS
-================
+2. DESCOMPILAR / DECOPILAR
+   - Selecciona el paquete importado y ejecuta DESCOMPILAR.
+   - Methos limpia la carpeta Decopilado del módulo antes de extraer.
+   - El resultado nuevo queda en Compilados/U/Decopilado o
+     Compilados/XDAT/Decopilado. El contenido anterior de Archivo no se borra.
 
-Aplicación unificada de Windows para trabajar con archivos .u y .xdat de Lineage II Interlude.
+3. EDITAR
+   - Abre Decopilado desde Methos.
+   - Puedes modificar los .uc o .xml con tu editor externo habitual.
+   - Methos no necesita que vuelvas a importar los archivos editados: al compilar
+     lee el contenido que exista en Decopilado en ese momento.
 
-INTERFAZ UNIFICADA
-Al abrir Methos verás dos botones superiores:
-- ARCHIVOS U: muestra las funciones para descompilar y compilar paquetes Unreal (.u).
-- ARCHIVOS XDAT: cambia a la vista del módulo XDAT, integrado dentro de la misma ventana principal.
+4. COMPILAR
+   - Selecciona el paquete base y pulsa COMPILAR.
+   - Methos valida el resultado antes de publicarlo.
+   - Guarda copias de seguridad del contenido anterior de Archivo.
+   - Sustituye el contenido de Archivo por el nuevo paquete compilado.
+   - No borra Decopilado: tus fuentes editadas permanecen disponibles.
 
-La barra superior identifica la vista activa. No necesitas abrir dos programas ni buscar accesos directos distintos.
+SEGURIDAD DE LOS ARCHIVOS
+-------------------------
+- Los archivos originales que están fuera de Compilados nunca se modifican.
+- Una extracción nueva limpia solamente Decopilado; no borra el paquete fuente.
+- Una compilación se prepara y valida en un archivo temporal antes de sustituir
+  Archivo.
+- Si falla la publicación de un paquete .u o .xdat, Methos intenta restaurar el
+  contenido anterior desde una copia independiente de recuperación.
+- Si la restauración automática también falla, la copia de recuperación se
+  conserva para permitir una recuperación posterior.
+- Los respaldos U se guardan en:
+  %LOCALAPPDATA%\Methos U Editor\Backups
+- Los respaldos XDAT se guardan en:
+  %LOCALAPPDATA%\Methos\Backups\XDAT
+- La caché de fuentes U se guarda fuera de las carpetas de trabajo, asociada al
+  SHA-256 del paquete correspondiente.
 
-CARPETAS DE TRABAJO
-Dentro de la carpeta donde se instala Methos se crean:
-- Archivos U\Comprimido
-  Aquí se colocan los paquetes .u que se van a descompilar o usar como base para compilar.
-- Archivos U\Descomprimido
-  Aquí aparecen las fuentes .uc extraídas y se editan las clases para volver a compilar.
+COMPILACIÓN DE ARCHIVOS U
+-------------------------
+Para Interface.u de Lineage II Interlude se utiliza el compilador UCC incluido
+en el instalador. Se incluyen 169 fuentes .uc de referencia y el runtime
+necesario; no hay que descargar ni configurar UCC manualmente.
 
-Las carpetas se crean automáticamente al abrir el programa. No es necesario crear nada manualmente.
+Las pruebas automatizadas verifican la compilación de las clases, la estructura
+del paquete, las tablas Name/Import/Export y un cambio real de bytecode en una
+función de prueba. El paquete recompilado no tiene por qué ser idéntico byte por
+byte al original: UCC vuelve a serializar el paquete.
 
-Cada vista mantiene sus propias acciones DESCOMPILAR y COMPILAR y sus propias carpetas de trabajo.
+Para otros paquetes .u, el motor nativo de Methos admite actualmente un
+subconjunto limitado de UnrealScript. No debe interpretarse como compatibilidad
+completa con todas las clases o construcciones del lenguaje.
 
-DESCOMPILAR
-1. Coloca o agrega el archivo .u en la lista.
-2. Selecciona el paquete.
-3. Pulsa DESCOMPILAR.
-4. Las fuentes .uc aparecen en la carpeta del paquete dentro de "Archivos U\\Descomprimido".
+COMPILACIÓN DE ARCHIVOS XDAT
+----------------------------
+XDAT extrae las ventanas y accesos directos XML y reconstruye el paquete usando
+el contenido actual de Decopilado. Las pruebas incluyen modificar un XML,
+recompilarlo y comprobar que el nuevo valor queda dentro del XDAT.
 
-Para el Interface.u original de Interlude incluido en este proyecto, Methos U reconoce el SHA-256 de la referencia y recupera las 169 fuentes originales verificadas incluidas con el kit Compilador U. Si el paquete fue compilado previamente por Methos U, recupera la copia exacta de fuentes guardada en la caché local.
-Para otros paquetes o versiones que no tengan una fuente de referencia, utiliza UELib como lector de compatibilidad. La salida de ese lector puede contener expresiones nativas que no se pueden reconstruir como UnrealScript original.
+Methos reconoce variantes documentadas de cifrado Lineage II y utiliza el motor
+integrado para los protocolos que tiene soportados. Si el cifrado no se reconoce,
+la versión no está soportada o no se puede verificar el resultado, el proceso se
+detiene sin modificar el original. No se debe asumir compatibilidad con claves
+privadas o cifrados personalizados no identificados.
 
-COMPILAR
-1. Selecciona el paquete .u en "Archivos U\\Comprimido".
-2. Comprueba que sus fuentes .uc estén en la carpeta correspondiente dentro de "Archivos U\\Descomprimido".
-3. Pulsa COMPILAR.
-4. El programa valida el resultado y solo entonces reemplaza el paquete de destino.
+VALIDACIÓN Y ALCANCE
+-------------------
+Las compilaciones automatizadas comprueban:
+- Instalación silenciosa y arranque de Methos.
+- Arranque del módulo XDAT integrado.
+- Presencia del motor de cifrado XDAT y runtime UCC.
+- Creación de las cuatro carpetas Compilados.
+- Compilación de las fuentes UCC y pruebas de modificación/reconstrucción.
+- Extracción, modificación, reconstrucción y recuperación segura de XDAT.
 
-Para Interface.u de Lineage II Interlude se utiliza el compilador UCC de Interlude incluido en el instalador. El instalador incorpora el runtime completo y las 169 fuentes de referencia; no tienes que descargarlos por separado. Se ejecuta internamente en una carpeta temporal; no necesitas instalar UCC, .NET ni ejecutar scripts manualmente.
-El resultado se comprueba con el analizador de paquetes y UELib. La prueba automatizada confirma 169 clases y las mismas tablas de nombres, imports y exports que el Interface.u de referencia.
-El paquete recompilado no tiene por qué ser idéntico byte por byte al original: UCC vuelve a serializar el paquete.
-
-SEGURIDAD Y COPIAS
-- El archivo .u original no se modifica durante la compilación temporal.
-- Si existe un destino, se guarda una copia de seguridad antes de reemplazarlo.
-- Las copias de seguridad y la caché de fuentes se guardan fuera de las dos carpetas de trabajo, en %LOCALAPPDATA%\Methos U Editor.
-- Después de una compilación correcta, Methos U guarda una copia de las fuentes asociada al hash del paquete generado. Así puede recuperarlas exactamente al volver a descompilarlo.
-
-ALCANCE
-El backend UCC incluido está preparado para Interface.u de Lineage II Interlude.
-Para otros paquetes .u, el motor nativo de Methos todavía solo admite un subconjunto limitado de funciones sencillas. No se debe interpretar esa compatibilidad parcial como soporte completo de todo UnrealScript.
-
-IMPORTANTE
-Aunque las pruebas automáticas verifican la estructura del paquete y sus 169 clases, todavía se debe probar cada Interface.u recompilado en una copia de prueba del cliente antes de usarlo en el juego. Conserva siempre el Interface.u original.
-
-
-DETECCIÓN DE CIFRADO
-Methos analiza primero la cabecera de los archivos antes de enviarlos a un lector o compilador.
-- Para XDAT, reconoce 18 versiones documentadas Lineage2Ver y conecta el motor público para las 9 variantes que soporta.
-- Para U, incorpora un detector de la misma familia de cabeceras y reconoce la firma de paquetes Unreal UE1/UE2 sin cifrar.
-- Una versión identificada no significa que todas las claves o protecciones privadas sean compatibles.
-- Si no reconoce el cifrado, muestra primero «No se reconoce este cifrado» y después los datos técnicos. El original se conserva.
-- En U, la detección está integrada; el descifrado automático de paquetes U es una fase separada que todavía debe conectarse y probarse.
-
-La vista XDAT se ejecuta integrada en la ventana principal de Methos. El instalador incluye sus componentes y el motor de cifrado necesario.
+Estas pruebas automáticas no sustituyen una comprobación final dentro del cliente
+real de Lineage II Interlude. Antes de usar un paquete modificado en el juego,
+conserva el archivo original y valida el resultado en una copia de prueba del
+cliente.
