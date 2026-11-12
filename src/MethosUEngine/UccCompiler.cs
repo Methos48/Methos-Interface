@@ -34,33 +34,32 @@ public static class UccCompiler
     private static string NormalizeRecoveredStateFunctionPrototypes(string source, out int removed)
     {
         removed = 0;
-        string[] lines = source.Replace("\\r\\n", "\\n").Replace('\\r', '\\n').Split('\\n');
+        string[] lines = source.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         var stateFunctionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int braceDepth = 0;
         int activeStateDepth = -1;
         bool inBlockComment = false;
 
-        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        foreach (string line in lines)
         {
-            string line = lines[lineIndex];
             if (activeStateDepth < 0 && braceDepth == 0 &&
-                Regex.IsMatch(line, @"^\\s*state\\s+\\w+\\b.*\\{", RegexOptions.IgnoreCase))
+                Regex.IsMatch(line, @"^\s*state\s+\w+\b.*\{", RegexOptions.IgnoreCase))
             {
-                activeStateDepth = braceDepth + CountCodeBraces(line, ref inBlockComment);
+                braceDepth += CountCodeBraces(line, ref inBlockComment);
+                activeStateDepth = braceDepth;
                 continue;
             }
 
             if (activeStateDepth >= 0)
             {
                 Match function = Regex.Match(line,
-                    @"^\\s*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\s+(?:(?:coerce|optional)\\s+)*(?:\\w+\\s+)?(?<name>\\w+)\\s*\\(",
+                    @"^\s*(?:(?:simulated|static|final|native|iterator|latent)\s+)*(?:function|event)\s+(?:(?:coerce|optional)\s+)*(?:\w+\s+)?(?<name>\w+)\s*\(",
                     RegexOptions.IgnoreCase);
                 if (function.Success)
                     stateFunctionNames.Add(function.Groups["name"].Value);
             }
 
-            int delta = CountCodeBraces(line, ref inBlockComment);
-            braceDepth += delta;
+            braceDepth += CountCodeBraces(line, ref inBlockComment);
             if (activeStateDepth >= 0 && braceDepth < activeStateDepth)
                 activeStateDepth = -1;
         }
@@ -73,7 +72,7 @@ public static class UccCompiler
         foreach (string line in lines)
         {
             Match prototype = Regex.Match(line,
-                @"^\\s*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\s+(?:(?:coerce|optional)\\s+)*(?:\\w+\\s+)?(?<name>\\w+)\\s*\\([^;]*\\)\\s*;\\s*$",
+                @"^\s*(?:(?:simulated|static|final|native|iterator|latent)\s+)*(?:function|event)\s+(?:(?:coerce|optional)\s+)*(?:\w+\s+)?(?<name>\w+)\s*\([^;]*\)\s*;\s*$",
                 RegexOptions.IgnoreCase);
             if (braceDepth == 0 && prototype.Success &&
                 stateFunctionNames.Contains(prototype.Groups["name"].Value))
@@ -95,7 +94,7 @@ public static class UccCompiler
         for (int i = 0; i < line.Length; i++)
         {
             char ch = line[i];
-            char next = i + 1 < line.Length ? line[i + 1] : '\\0';
+            char next = i + 1 < line.Length ? line[i + 1] : '\0';
             if (inBlockComment)
             {
                 if (ch == '*' && next == '/') { inBlockComment = false; i++; }
@@ -103,7 +102,7 @@ public static class UccCompiler
             }
             if (!inString && ch == '/' && next == '/') break;
             if (!inString && ch == '/' && next == '*') { inBlockComment = true; i++; continue; }
-            if (ch == '"' && (i == 0 || line[i - 1] != '\\\\')) { inString = !inString; continue; }
+            if (ch == '"' && (i == 0 || line[i - 1] != '\\')) { inString = !inString; continue; }
             if (inString) continue;
             if (ch == '{') delta++;
             else if (ch == '}') delta--;
