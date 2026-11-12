@@ -144,17 +144,16 @@ if (args.Length >= 5 && args[0] == "--verify-function-return")
         .Single(item => (int)item > 0 && item.Name.ToString().Equals(verifyClassName, StringComparison.OrdinalIgnoreCase));
     var verifyFunction = EnumerateClassFunctions(verifyClassObject)
         .Single(item => item.Name.ToString().Equals(verifyFunctionName, StringComparison.OrdinalIgnoreCase));
-    var verifyPackageIndex = UnrealPackageIndex.Open(verifyPackagePath);
     string verifyDecompiledClass = verifyClassObject.Decompile();
-    string verifyFunctionPattern = @"(?is)function\\s+int\\s+" +
+    string verifyFunctionPattern = @"(?is)function\s+int\s+" +
         Regex.Escape(verifyFunctionName) +
-        @"\\s*\\([^)]*\\)\\s*\\{(?<body>.*?)\\}";
+        @"\s*\([^)]*\)\s*\{(?<body>.*?)\}";
     Match verifyFunctionMatch = Regex.Match(verifyDecompiledClass, verifyFunctionPattern);
     if (!verifyFunctionMatch.Success)
         throw new Exception($"UELib could not locate {verifyClassName}.{verifyFunctionName} in the compiled class source.");
     string verifyCompiledBody = verifyFunctionMatch.Groups["body"].Value;
     if (!Regex.IsMatch(verifyCompiledBody,
-        @"\\breturn\\s+" + Regex.Escape(verifyExpectedReturn) + @"\\s*;",
+        @"\breturn\s+" + Regex.Escape(verifyExpectedReturn) + @"\s*;",
         RegexOptions.IgnoreCase))
         throw new Exception($"Compiled {verifyClassName}.{verifyFunctionName} did not contain expected return {verifyExpectedReturn}. Actual body: {verifyCompiledBody}");
     Console.WriteLine($"PASS: {verifyClassName}.{verifyFunctionName} bytecode decompiles to return {verifyExpectedReturn}.");
