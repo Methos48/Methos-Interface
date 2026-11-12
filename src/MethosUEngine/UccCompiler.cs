@@ -47,6 +47,54 @@ public static class UccCompiler
         return source;
     }
 
+    // UELib sometimes loses closing braces when it reconstructs UnrealScript control flow.
+    // Before a new top-level function, close any blocks left open by the previous function.
+    // This runs only on temporary compiler staging copies and never changes the user's sources.
+    private static string NormalizeRecoveredFunctionBlocks(string source, out int insertedClosures)
+    {
+        insertedClosures = 0;
+        var output = new StringBuilder(source.Length + 256);
+        int depth = 0;
+        bool inBlockComment = false;
+
+        foreach (string line in source.Replace("\\r\\n", "\\n").Replace('\\r', '\\n').Split('\\n'))
+        {
+            if (Regex.IsMatch(line, @"^[\\t ]*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\b",
+                    RegexOptions.IgnoreCase) && depth > 0)
+            {
+                output.AppendLine(new string('}', depth));
+                insertedClosures += depth;
+                depth = 0;
+            }
+
+            bool inString = false;
+            for (int i = 0; i < line.Length; i++)
+            {
+                char ch = line[i];
+                char next = i + 1 < line.Length ? line[i + 1] : '\\0';
+                if (inBlockComment)
+                {
+                    if (ch == '*' && next == '/') { inBlockComment = false; i++; }
+                    continue;
+                }
+                if (!inString && ch == '/' && next == '/') break;
+                if (!inString && ch == '/' && next == '*') { inBlockComment = true; i++; continue; }
+                if (ch == '"' && (i == 0 || line[i - 1] != '\\\\')) { inString = !inString; continue; }
+                if (inString) continue;
+                if (ch == '{') depth++;
+                else if (ch == '}') depth = Math.Max(0, depth - 1);
+            }
+            output.AppendLine(line);
+        }
+
+        if (depth > 0)
+        {
+            output.AppendLine(new string('}', depth));
+            insertedClosures += depth;
+        }
+        return output.ToString();
+    }
+
     public static bool IsAvailable(string runtimeRoot)
     {
         string system = Path.Combine(runtimeRoot, "Interlude", "System");
@@ -115,6 +163,8 @@ public static class UccCompiler
                     source = NormalizeRecoveredStructOrder(source, out bool movedStruct);
                     if (movedStruct) repairedIdentifiers++;
                 }
+                source = NormalizeRecoveredFunctionBlocks(source, out int insertedClosures);
+                repairedIdentifiers += insertedClosures;
                 File.WriteAllText(Path.Combine(stagedClasses, Path.GetFileName(file)), source, new UTF8Encoding(false));
             }
 
