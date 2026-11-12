@@ -27,6 +27,26 @@ public static class UccCompiler
             ['\u001D'] = "MethosRecoveredFunction_29"
         };
 
+    // Some UELib decompilations preserve a local struct below the fields that use it.
+    // Interlude UCC resolves struct types in declaration order, so move this recovered
+    // ChatWnd-local struct above its first use in the staged copy.
+    private static string NormalizeRecoveredStructOrder(string source, out bool changed)
+    {
+        changed = false;
+        var declaration = Regex.Match(source,
+            @"(?ms)^[\\t ]*struct\\s+ChatFilterInfo\\s*\\{.*?^[\\t ]*\\};[\\t ]*\\r?\\n?");
+        if (!declaration.Success) return source;
+
+        string structText = declaration.Value.Trim();
+        source = source.Remove(declaration.Index, declaration.Length);
+        var classLine = Regex.Match(source, @"(?m)^\\s*class\\s+ChatWnd\\b[^;]*;[\\t ]*\\r?\\n?");
+        if (!classLine.Success) return source.Insert(declaration.Index, declaration.Value);
+
+        source = source.Insert(classLine.Index + classLine.Length, Environment.NewLine + structText + Environment.NewLine);
+        changed = true;
+        return source;
+    }
+
     public static bool IsAvailable(string runtimeRoot)
     {
         string system = Path.Combine(runtimeRoot, "Interlude", "System");
@@ -89,6 +109,11 @@ public static class UccCompiler
                         source = source.Replace(pair.Key.ToString(), pair.Value);
                         repairedIdentifiers += count;
                     }
+                }
+                if (Path.GetFileName(file).Equals("ChatWnd.uc", StringComparison.OrdinalIgnoreCase))
+                {
+                    source = NormalizeRecoveredStructOrder(source, out bool movedStruct);
+                    if (movedStruct) repairedIdentifiers++;
                 }
                 File.WriteAllText(Path.Combine(stagedClasses, Path.GetFileName(file)), source, new UTF8Encoding(false));
             }
