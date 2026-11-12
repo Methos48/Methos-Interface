@@ -257,3 +257,36 @@ Sources:
 
 Status:
 We now have two independent historical sources describing the same SmartCrypt transparent-decryption mechanism through Core.dll. Exact export availability and successful extraction in this L2Sudamerica build remain unverified.
+
+
+## Step 15 — SmartDecrypt 1.5.2.2 version match and capture correctness audit
+
+Date: 2026-11-12
+
+The published SmartDecrypt 1.5.2.2 procedure is now compared against the exact protection-module version already identified in this client:
+- The supplied `npkscrypt.dll` was previously fingerprinted as version 1.5.2.2.
+- The published procedure explicitly labels itself Smart Crypt Decryptor 1.5.2.2.
+- It hooks `CreateFileW` and `ReadFile`, tracks the handle opened for `SysString-e.dat`, and writes the bytes read by the client to `decrypted_file.txt`.
+- Its instructions say to temporarily present the target file under the name `SysString-e.dat`, launch the client, and collect the captured output. The post describes the captured output as still using the ordinary Lineage II archive encryption (examples 413/111), so this is an intermediate extraction stage, not necessarily a final editor-ready file.
+
+This is the closest documented version match found so far for the supplied protection DLL. It makes the ReadFile-capture route the leading controlled experiment for this exact client, ahead of assuming the older Core.dll export method works.
+
+Correctness problems in the published sample that must be fixed before relying on its output:
+1. It writes `nNumberOfBytesToRead` instead of the actual completed byte count `*lpNumberOfBytesRead`. This can append uninitialized/stale buffer bytes on short reads.
+2. It does not check the `ReadFile` return value or whether `lpNumberOfBytesRead` is valid.
+3. It does not correctly handle overlapped/asynchronous reads, where completion may occur later.
+4. It concatenates reads in callback order without recording file offsets. If the client seeks or reads out of order, the dump may not reconstruct the original stream.
+5. It uses a simple counter to choose truncate/append behavior and does not robustly reset per file handle/open instance.
+
+Therefore the public DLL is useful as proof of the capture point and version target, but its raw output must not be trusted as a verified decrypt until byte counts, offsets, completion semantics, and output structure are checked.
+
+Controlled test plan (not yet executed):
+- Work only on a disposable copy of the client and preserve the original files.
+- Test `interface.u` and `interface.xdat` separately, each renamed to `SysString-e.dat` only in the disposable test copy.
+- Capture successful reads using the actual transferred byte count; preserve offsets and handle partial/overlapped completion correctly.
+- Verify the dump length and structure, then identify whether the output begins with a normal Lineage2 archive header such as `Lineage2Ver` and determine its version.
+- Feed the resulting U and XDAT through their respective standard decoders only after the outer capture is validated.
+- For U, separately test for any additional obfuscation reported in historical Interlude cases.
+
+Status:
+The exact SmartCrypt module version aligns with the published SmartDecrypt 1.5.2.2 method. This is a strong actionable match, but no output from the user's exact U/XDAT samples has yet been captured or validated. Do not label either file decrypted until the controlled test passes.
