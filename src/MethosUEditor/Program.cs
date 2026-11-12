@@ -670,7 +670,13 @@ internal sealed class MainForm : Form
             inspection.Plan.Status, family, protocol,
             headerHex, inspection.Plan.Explanation, checked((int)package.Summary.Version),
             checked((int)package.Summary.LicenseeVersion), inspection);
-        Log($"Perfil de origen guardado: {metadataPath}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
+        Log($"Perfil de origen guardado: {metadataPath}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(originalBytes))}.");
+        }
+        finally
+        {
+            if (decodedTempPath is not null && File.Exists(decodedTempPath))
+                File.Delete(decodedTempPath);
+        }
     });
 
     private static string ApplyNativeBytecodeDecompilation(string source, UClass classObject,
@@ -714,13 +720,7 @@ internal sealed class MainForm : Form
                             if (string.Equals(packageIndex.Names[i], name, StringComparison.OrdinalIgnoreCase))
                                 return i;
                         throw new InvalidDataException($"La constante Name '{name}' no existe en la tabla del paquete.");
-                        }
-        finally
-        {
-            if (decodedTempPath is not null && File.Exists(decodedTempPath))
-                File.Delete(decodedTempPath);
-        }
-    });
+                    });
 
                 // Only replace the source text when the native compiler recreates the exact original bytecode.
                 // This makes the native decompiler a verified round-trip, not a guess based on formatting.
