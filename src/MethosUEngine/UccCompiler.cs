@@ -38,15 +38,29 @@ public static class UccCompiler
         var stateFunctionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int braceDepth = 0;
         int activeStateDepth = -1;
+        bool pendingStateOpen = false;
         bool inBlockComment = false;
 
         foreach (string line in lines)
         {
             if (activeStateDepth < 0 && braceDepth == 0 &&
-                Regex.IsMatch(line, @"^\s*state\s+\w+\b.*\{", RegexOptions.IgnoreCase))
+                Regex.IsMatch(line, @"^\s*state\s+\w+\b", RegexOptions.IgnoreCase))
+            {
+                int delta = CountCodeBraces(line, ref inBlockComment);
+                braceDepth += delta;
+                if (delta > 0) activeStateDepth = braceDepth;
+                else pendingStateOpen = true;
+                continue;
+            }
+
+            if (pendingStateOpen)
             {
                 braceDepth += CountCodeBraces(line, ref inBlockComment);
-                activeStateDepth = braceDepth;
+                if (braceDepth > 0)
+                {
+                    activeStateDepth = braceDepth;
+                    pendingStateOpen = false;
+                }
                 continue;
             }
 
