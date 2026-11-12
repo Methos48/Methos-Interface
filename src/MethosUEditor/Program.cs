@@ -1109,6 +1109,25 @@ internal sealed class MainForm : Form
         }
     });
 
+    private static byte[] EncodeCompiledPackage(byte[] plainPackage,
+        ProtectionPipelineInspection? inspection, ProtectionCodecRuntime? runtime, string originalFileName)
+    {
+        ArgumentNullException.ThrowIfNull(plainPackage);
+        if (inspection is null)
+            throw new InvalidOperationException("Falta el perfil de protección Methos; no se generará un paquete sin verificar.");
+        if (inspection.Plan.Layers.Count == 0)
+            return plainPackage;
+        if (!inspection.Plan.CanEncode || runtime is null)
+            throw new NotSupportedException("No se puede reconstruir el protocolo original. La compilación fue detenida.");
+
+        byte[] encrypted = runtime.Encode(inspection.Plan, plainPackage, originalFileName);
+        byte[] decoded = runtime.Decode(inspection.Plan, encrypted, originalFileName);
+        if (!decoded.AsSpan().SequenceEqual(plainPackage))
+            throw new InvalidDataException("La verificación posterior a la compilación no recuperó exactamente el paquete generado.");
+        _ = UnrealPackageIndex.Parse(decoded);
+        return encrypted;
+    }
+
     private static IEnumerable<UFunction> EnumerateClassFunctions(UStruct owner)
     {
         owner.Load();
