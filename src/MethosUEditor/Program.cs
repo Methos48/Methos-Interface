@@ -22,10 +22,10 @@ internal static class Program
 internal sealed class MainForm : Form
 {
     private string AppRoot => AppContext.BaseDirectory;
-    private string CompleteDir => Path.Combine(AppRoot, "Archivos U", "Comprimido");
-    private string PartsDir => Path.Combine(AppRoot, "Archivos U", "Descomprimido");
-    private string XdatCompleteDir => Path.Combine(AppRoot, "Archivos XDAT", "Comprimido");
-    private string XdatPartsDir => Path.Combine(AppRoot, "Archivos XDAT", "Descomprimido");
+    private string CompleteDir => Path.Combine(AppRoot, "Compilados", "U", "Archivo");
+    private string PartsDir => Path.Combine(AppRoot, "Compilados", "U", "Decopilado");
+    private string XdatCompleteDir => Path.Combine(AppRoot, "Compilados", "XDAT", "Archivo");
+    private string XdatPartsDir => Path.Combine(AppRoot, "Compilados", "XDAT", "Decopilado");
     private const string OriginalInterfaceSha256 = "A3074E83A54D3C681BC67830D87BC38FDAB1D0A30EB77384DA2F615F619D5B71";
     private string UccRuntimeRoot => Path.Combine(AppContext.BaseDirectory, "UccRuntime");
     private string SourceCacheRoot => Path.Combine(
@@ -37,7 +37,7 @@ internal sealed class MainForm : Form
     private readonly Label status = new() { Dock = DockStyle.Bottom, Height = 24, Text = "Listo", TextAlign = ContentAlignment.MiddleLeft };
     private readonly List<string> inputs = new();
     private readonly Button loadOriginal = new() { Text = "CARGAR ARCHIVO", Height = 48, Width = 150 };
-    private readonly Button loadSources = new() { Text = "CARGAR ARCHIVOS DESCOMPILADOS", Height = 48, Width = 235 };
+    private readonly Button loadSources = new() { Text = "CARGAR ARCHIVOS DECOPILADOS", Height = 48, Width = 235 };
     private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Width = 140 };
     private readonly Button compile = new() { Text = "COMPILAR", Height = 48, Width = 170 };
     private readonly Panel xdatHostPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
@@ -80,7 +80,7 @@ internal sealed class MainForm : Form
         Directory.CreateDirectory(XdatPartsDir);
         BuildLayout();
         RefreshInputs();
-        Log("Carpetas de trabajo junto al programa:");
+        Log("Estructura de trabajo Compilados/U y Compilados/XDAT creada junto al programa:");
         Log(CompleteDir);
         Log(PartsDir);
     }
@@ -137,8 +137,8 @@ internal sealed class MainForm : Form
         homePanel.Controls.Add(intro);
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(12), BackColor = Color.FromArgb(25, 31, 44) };
-        var openComplete = new Button { Text = "Abrir Comprimido", Width = 145, Height = 42 };
-        var openParts = new Button { Text = "Abrir Descomprimido", Width = 155, Height = 42 };
+        var openComplete = new Button { Text = "Abrir Archivo", Width = 145, Height = 42 };
+        var openParts = new Button { Text = "Abrir Decopilado", Width = 155, Height = 42 };
         actions.Controls.AddRange(new Control[] { loadOriginal, decompile, loadSources, compile, openComplete, openParts });
 
         var split = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterDistance = 430, Padding = new Padding(10), BackColor = Color.FromArgb(17, 23, 34) };
