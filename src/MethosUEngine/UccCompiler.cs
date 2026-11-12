@@ -124,14 +124,14 @@ public static class UccCompiler
         return delta;
     }
 
-    // UELib can emit class-local structs after fields that already use them.
-    // Interlude UCC resolves struct types in declaration order, so move recovered
-    // struct declarations immediately after the class declaration in the staged copy.
+    // UELib can emit class-local structs and enums after fields that already use them.
+    // Interlude UCC resolves these types in declaration order, so move recovered type
+    // declarations immediately after the class declaration in the staged copy.
     private static string NormalizeRecoveredStructOrder(string source, out bool changed)
     {
         changed = false;
         MatchCollection matches = Regex.Matches(source,
-            @"(?ms)^[\t ]*struct\s+\w+\s*\{.*?^[\t ]*\};[\t ]*\r?\n?");
+            @"(?ms)^[\t ]*(?:struct|enum)\s+\w+\s*\{.*?^[\t ]*\};[\t ]*\r?\n?");
         if (matches.Count == 0) return source;
 
         var declarations = matches.Cast<Match>().Select(match => match.Value.Trim()).ToArray();
