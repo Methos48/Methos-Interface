@@ -1,0 +1,20 @@
+name: Methos protection planner smoke tests
+on:
+  push:
+    paths:
+      - 'src/MethosUEngine/**'
+      - 'tools/ProtectionPipelineSmoke/**'
+      - '.github/workflows/protection-pipeline-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run planner smoke tests
+        run: dotnet run --project tools/ProtectionPipelineSmoke/ProtectionPipelineSmoke.csproj --configuration Release
