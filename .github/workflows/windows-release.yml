@@ -131,6 +131,12 @@ jobs:
           path: native-function-registry.json
           if-no-files-found: ignore
 
+      - name: Crear icono oficial de Methos (M roja)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src/MethosUEditor/Assets | Out-Null
+          ./installer/Create-MethosIcon.ps1 -OutputPath src/MethosUEditor/Assets/Methos.ico
+
       - name: Publicar ejecutable autónomo x64
         shell: pwsh
         run: |
