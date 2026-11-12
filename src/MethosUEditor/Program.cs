@@ -894,6 +894,11 @@ internal sealed class MainForm : Form
         }
 
         string originManifest = Path.Combine(sourceDirectory, ".methos", "origin.json");
+        string originalFileName = Path.GetFileName(packagePath);
+        byte[] packageBytes = File.ReadAllBytes(packagePath);
+        ProtectionPipelineInspection? protectionInspection = null;
+        ProtectionCodecRuntime? protectionRuntime = null;
+
         if (File.Exists(originManifest))
         {
             string immutableOriginal = Path.Combine(Path.GetDirectoryName(originManifest)!, "originals", Path.GetFileName(packagePath));
@@ -901,13 +906,35 @@ internal sealed class MainForm : Form
                 throw new FileNotFoundException("Falta la copia original inmutable necesaria para validar el perfil Methos.", immutableOriginal);
             using var origin = PackageOriginMetadata.TryLoadAndValidate(originManifest, immutableOriginal)
                 ?? throw new InvalidDataException("No se pudo leer el perfil de origen Methos.");
-            var encoding = origin.RootElement.GetProperty("encoding");
-            int? recordedProtocol = encoding.TryGetProperty("protocol_version", out var protocolValue) &&
-                protocolValue.ValueKind == System.Text.Json.JsonValueKind.Number
-                ? protocolValue.GetInt32() : null;
-            if (recordedProtocol.HasValue)
-                throw new NotSupportedException($"El paquete original usaba el protocolo {recordedProtocol}. El perfil fue conservado, pero el codificador U para ese protocolo todavía no está integrado. No se generó un archivo con cifrado diferente.");
-            Log("Perfil de origen verificado por SHA-256. No se detectó protocolo cifrado que requiera recodificación.");
+            originalFileName = origin.RootElement.GetProperty("source").GetProperty("file_name").GetString()
+                ?? Path.GetFileName(packagePath);
+            byte[] originalBytes = File.ReadAllBytes(immutableOriginal);
+            protectionInspection = ProtectionPipelinePlanner.InspectFullPipeline(originalBytes, originalFileName);
+            if (!protectionInspection.IsPlaintextCandidate || !protectionInspection.Plan.CanDecode ||
+                (protectionInspection.Plan.Layers.Count > 0 && !protectionInspection.Plan.CanEncode))
+                throw new NotSupportedException("El perfil original no permite reconstruir todas las capas de protección. No se modificó Comprimido.");
+            if (protectionInspection.Plan.Layers.Count > 0)
+            {
+                protectionRuntime = ProtectionCodecRuntime.CreateDefault(
+                    smartCryptProfile: protectionInspection.SmartCryptProfile,
+                    lineage2CustomTailProfile: protectionInspection.Lineage2CustomTailProfile);
+                byte[] originalPlain = protectionRuntime.Decode(protectionInspection.Plan, originalBytes, originalFileName);
+                byte[] originalRebuilt = protectionRuntime.Encode(protectionInspection.Plan, originalPlain, originalFileName);
+                if (!originalRebuilt.AsSpan().SequenceEqual(originalBytes))
+                    throw new InvalidDataException("El perfil Methos no reconstruyó el original inmutable byte por byte.");
+                packageBytes = protectionRuntime.Decode(protectionInspection.Plan, packageBytes, originalFileName);
+            }
+            else
+            {
+                packageBytes = File.ReadAllBytes(packagePath);
+            }
+            Log($"Perfil Methos verificado por SHA-256. Capas: {string.Join(" + ", protectionInspection.Plan.Layers.Select(layer => layer.Id))}; codificación reversible={protectionInspection.Plan.CanEncode}.");
+        }
+        else
+        {
+            protectionInspection = ProtectionPipelinePlanner.InspectFullPipeline(packageBytes, originalFileName);
+            if (!protectionInspection.IsPlaintextCandidate || protectionInspection.Plan.Layers.Count > 0)
+                throw new InvalidDataException("No existe un perfil Methos con copia original inmutable. Vuelve a cargar y descompilar el archivo antes de compilar; no se modificó Comprimido.");
         }
 
         var ucFiles = GetSourceFiles(sourceDirectory);
@@ -968,10 +995,10 @@ internal sealed class MainForm : Form
 
         Log($"Runtime UCC no disponible para {baseName}. Se utilizará el motor nativo Methos (compatibilidad limitada).");
         Log($"Motor nativo Methos: preparando {ucFiles.Length} fuentes .uc.");
-        byte[] packageBytes = File.ReadAllBytes(packagePath);
         var nativePackage = UnrealPackageIndex.Parse(packageBytes);
 
-        using var metadataPackage = UnrealLoader.LoadPackage(packagePath, FileAccess.Read);
+        using var basePackageFile = new TemporaryPackageFile(packageBytes, ".u");
+        using var metadataPackage = UnrealLoader.LoadPackage(basePackageFile.Path, FileAccess.Read);
         metadataPackage.InitializePackage();
         var classes = metadataPackage.Objects.OfType<UClass>()
             .Where(item => (int)item > 0)
