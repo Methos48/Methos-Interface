@@ -126,3 +126,43 @@ Current evidence:
 
 Source:
 - https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/
+
+
+## Step 11 — early SmartCrypt implementation and post-decryption obfuscation
+
+Date: 2026-11-11
+
+A second, independent public SmartCrypt guide (March 2021) provides an older extraction method distinct from the 2024 ReadFile capture shim.
+
+What the older method actually does:
+- Injects a small DLL into the game process by adding its import to `l2.exe`.
+- Waits until `WinDrv.dll` is loaded.
+- Resolves exported functions from `Core.dll`: `appLoadFileToArray`, `appSaveArrayToFile`, and the global `GFileManager`.
+- Calls the client's own file manager to load `..\\System\\Interface.u` and save `..\\System\\Interface.decrypted.u`.
+- The guide labels this specifically as a decryptor for early SmartCrypt revisions and says it can be adapted to other files by changing the source path.
+
+This gives us an important distinction:
+- The 2021 method is a client-side file-manager extraction route for earlier SmartCrypt builds.
+- The 2024 SmartDecrypt method captures the ReadFile stream after arranging the `ogg.dll` import order relative to `npkscrypt`.
+- These are different hook/capture points and may expose different layers. We must not assume their outputs are interchangeable.
+
+Critical finding about the U file:
+- In the same Interlude discussion where a developer confirms the submitted `interface.u` and `interface.xdat` are SmartCrypt-protected, another experienced participant reports that the U file is additionally obfuscated after decryption.
+- Therefore successful removal of the SmartCrypt envelope may still leave a second, independent U-specific obfuscation that prevents normal package extraction. Methos must classify this as a separate stage, not misdiagnose it as failed SmartCrypt decryption.
+- That report does not establish whether the user's L2Sudamerica U has the same obfuscation.
+
+Limits and next validation:
+1. Compare the exact exports/signatures used by the 2021 method with the supplied `Core.dll`; do not assume the decorated names match across client builds.
+2. Verify whether the loaded file manager applies SmartCrypt transparently in this client's revision.
+3. Establish whether the 2024 `ogg.dll`/SmartDecrypt method intercepts the same layer or a later one.
+4. Capture U and XDAT independently; inspect both outputs for valid format markers and structural consistency.
+5. If U remains obfuscated, identify that transform separately after SmartCrypt has been proven removed.
+6. Require unchanged round-trip and client-load tests before implementing write support.
+
+Sources:
+- https://maxcheaters.com/topic/239616-smart-crypt-decryptor/
+- https://maxcheaters.com/topic/245142-decrypt-interfaceuxdat-interlude/
+- https://mmo-dev.info/resources/smart-decryptor.3096/
+
+Status update:
+The SmartCrypt identification is strongly supported as a protection family for Interlude interface U/XDAT files. The 2021 and 2024 extraction mechanisms are now understood at a high level. The exact L2Sudamerica protection revision, output layer, and any additional U obfuscation remain to be tested against the uploaded binaries.
