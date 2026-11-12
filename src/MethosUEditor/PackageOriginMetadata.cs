@@ -51,7 +51,7 @@ internal static class PackageOriginMetadata
                     : protection.Plan.CanEncode
                         ? "Todas las capas detectadas tienen perfil original y superaron la prueba de ida y vuelta."
                         : "El paquete puede inspeccionarse, pero Methos debe detener la compilación hasta recuperar un perfil de codificación verificable.",
-                layers = protection?.Plan.Layers.Select(layer => new
+                layers = protection is null ? Array.Empty<object>() : protection.Plan.Layers.Select(layer => (object)new
                 {
                     kind = layer.Kind.ToString(),
                     id = layer.Id,
@@ -59,7 +59,7 @@ internal static class PackageOriginMetadata
                     decode_available = layer.DecodeAvailable,
                     encode_available = layer.EncodeAvailable,
                     evidence = layer.Evidence
-                }).ToArray() ?? Array.Empty<object>(),
+                }).ToArray(),
                 smartcrypt_profile = protection?.SmartCryptProfile is { } smart ? new
                 {
                     marker_hex = Convert.ToHexString(smart.Marker),
