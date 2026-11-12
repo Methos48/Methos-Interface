@@ -69,6 +69,7 @@ internal sealed class MainForm : Form
     public MainForm()
     {
         Text = "Methos - Archivos U";
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = 980; Height = 700; MinimumSize = new Size(820, 560);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(245, 247, 250);
