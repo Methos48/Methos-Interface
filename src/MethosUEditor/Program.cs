@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
 using System.Text;
 using UELib;
 using MethosUEngine;
@@ -41,31 +40,12 @@ internal sealed class MainForm : Form
     private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Width = 140 };
     private readonly Button compile = new() { Text = "COMPILAR", Height = 48, Width = 170 };
     private readonly Panel xdatHostPanel = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 247, 250) };
+    private readonly ListBox xdatFiles = new() { Dock = DockStyle.Fill, SelectionMode = SelectionMode.One };
+    private readonly TextBox xdatLog = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+    private readonly Label xdatStatus = new() { Dock = DockStyle.Bottom, Height = 25, Text = "Listo", TextAlign = ContentAlignment.MiddleLeft };
+    private readonly List<string> xdatInputs = new();
     private Panel? uViewPanel;
     private Panel? homePanel;
-    private Process? xdatProcess;
-    private IntPtr xdatWindow = IntPtr.Zero;
-    private string XdatExePath => Path.Combine(AppRoot, "XDAT", "Methos XDAT.exe");
-
-    private const int GwlStyle = -16;
-    private const long WsChild = 0x40000000L;
-    private const long WsPopup = unchecked((long)0x80000000);
-    private const long WsCaption = 0x00C00000L;
-    private const long WsThickFrame = 0x00040000L;
-    private const long WsBorder = 0x00800000L;
-    private const long WsSysMenu = 0x00080000L;
-    private const long WsMinimizeBox = 0x00020000L;
-    private const long WsMaximizeBox = 0x00010000L;
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
-    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
-    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
 
     public MainForm()
     {
@@ -85,7 +65,9 @@ internal sealed class MainForm : Form
         Directory.CreateDirectory(XdatCompleteDir);
         Directory.CreateDirectory(XdatPartsDir);
         BuildLayout();
+        BuildXdatView();
         RefreshInputs();
+        RefreshXdatInputs();
         Log("Estructura de trabajo Compilados/U y Compilados/XDAT creada junto al programa:");
         Log(CompleteDir);
         Log(PartsDir);
@@ -204,18 +186,7 @@ internal sealed class MainForm : Form
         uViewPanel.Controls.Add(actions);
 
         xdatHostPanel.Visible = false;
-        xdatHostPanel.BackColor = Color.FromArgb(13, 24, 42);
-        xdatHostPanel.Resize += (_, _) => ResizeXdatWindow();
-        xdatHostPanel.Controls.Add(new Label
-        {
-            Name = "xdatPlaceholder",
-            Text = "METHOS XDAT\nPreparando el módulo XDAT...",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI", 15, FontStyle.Bold),
-            ForeColor = Color.FromArgb(104, 177, 255),
-            BackColor = Color.FromArgb(13, 24, 42)
-        });
+        xdatHostPanel.BackColor = Color.FromArgb(17, 23, 34);
 
         Controls.Add(xdatHostPanel);
         Controls.Add(uViewPanel);
@@ -237,7 +208,6 @@ internal sealed class MainForm : Form
         xCard.Controls.OfType<Button>().First().Click += async (_, _) => OpenXdat();
         homeButton.Click += (_, _) =>
         {
-            StopXdatProcess();
             uViewPanel.Visible = false;
             xdatHostPanel.Visible = false;
             homePanel.Visible = true;
@@ -250,112 +220,229 @@ internal sealed class MainForm : Form
         openParts.Click += (_, _) => OpenFolder(PartsDir);
         decompile.Click += async (_, _) => await RunSelectedAsync(DecompileFile);
         compile.Click += async (_, _) => await RunSelectedAsync(CompileFolder);
-        FormClosed += (_, _) => StopXdatProcess();
     }
 
     private Task ShowUViewAsync()
     {
-        StopXdatProcess();
-        if (xdatHostPanel is not null) xdatHostPanel.Visible = false;
+        xdatHostPanel.Visible = false;
         if (uViewPanel is not null) uViewPanel.Visible = true;
         Text = "Methos - Archivos U";
         return Task.CompletedTask;
     }
 
-    private async Task ShowXdatViewAsync()
+    private Task ShowXdatViewAsync()
     {
         if (uViewPanel is not null) uViewPanel.Visible = false;
         xdatHostPanel.Visible = true;
         Text = "Methos - Archivos XDAT";
-        if (xdatProcess is { HasExited: false } && xdatWindow != IntPtr.Zero)
+        RefreshXdatInputs();
+        return Task.CompletedTask;
+    }
+
+    private void BuildXdatView()
+    {
+        var actions = new FlowLayoutPanel
         {
-            ResizeXdatWindow();
+            Dock = DockStyle.Top, Height = 76, Padding = new Padding(12),
+            BackColor = Color.FromArgb(25, 31, 44), WrapContents = false
+        };
+        var add = new Button { Text = "CARGAR XDAT", Width = 145, Height = 42 };
+        var decompile = new Button { Text = "DESCOMPILAR", Width = 140, Height = 42 };
+        var compile = new Button { Text = "COMPILAR", Width = 140, Height = 42 };
+        var openArchive = new Button { Text = "ABRIR ARCHIVO", Width = 135, Height = 42 };
+        var openParts = new Button { Text = "ABRIR DECOPILADO", Width = 165, Height = 42 };
+        actions.Controls.AddRange(new Control[] { add, decompile, compile, openArchive, openParts });
+
+        var split = new SplitContainer
+        {
+            Dock = DockStyle.Fill, Orientation = Orientation.Vertical,
+            SplitterDistance = 350, BackColor = Color.FromArgb(17, 23, 34)
+        };
+        var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = Color.FromArgb(24, 35, 52) };
+        xdatFiles.BackColor = Color.FromArgb(20, 23, 32);
+        xdatFiles.ForeColor = Color.White;
+        left.Controls.Add(xdatFiles);
+        left.Controls.Add(new Label
+        {
+            Text = "ARCHIVOS XDAT EN ARCHIVO", Dock = DockStyle.Top, Height = 34,
+            ForeColor = Color.FromArgb(104, 177, 255), Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        });
+        split.Panel1.Controls.Add(left);
+
+        var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = Color.FromArgb(18, 29, 47) };
+        xdatLog.BackColor = Color.FromArgb(12, 19, 30);
+        xdatLog.ForeColor = Color.FromArgb(190, 211, 235);
+        right.Controls.Add(xdatLog);
+        right.Controls.Add(new Label
+        {
+            Text = "REGISTRO DE ACTIVIDAD XDAT", Dock = DockStyle.Top, Height = 34,
+            ForeColor = Color.FromArgb(104, 177, 255), Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        });
+        split.Panel2.Controls.Add(right);
+
+        xdatHostPanel.Controls.Add(split);
+        xdatHostPanel.Controls.Add(xdatStatus);
+        xdatHostPanel.Controls.Add(actions);
+        add.Click += (_, _) => AddXdatPackages();
+        decompile.Click += async (_, _) => await RunXdatDecompileAsync(decompile, compile);
+        compile.Click += async (_, _) => await RunXdatCompileAsync(decompile, compile);
+        openArchive.Click += (_, _) => OpenFolder(XdatCompleteDir);
+        openParts.Click += (_, _) => OpenFolder(XdatPartsDir);
+    }
+
+    private void AddXdatPackages()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "Archivos XDAT (*.xdat)|*.xdat|Todos los archivos (*.*)|*.*",
+            Multiselect = true,
+            Title = "Seleccionar archivo(s) XDAT"
+        };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        int added = 0;
+        foreach (string source in dialog.FileNames)
+        {
+            string destination = Path.Combine(XdatCompleteDir, Path.GetFileName(source));
+            if (!SamePath(source, destination))
+            {
+                CopyWithBackup(source, destination);
+                added++;
+            }
+        }
+        RefreshXdatInputs();
+        LogXdat($"{added} archivo(s) XDAT cargado(s). Se conservaron las copias de seguridad.");
+    }
+
+    private void RefreshXdatInputs()
+    {
+        xdatInputs.Clear();
+        if (Directory.Exists(XdatCompleteDir))
+            xdatInputs.AddRange(Directory.GetFiles(XdatCompleteDir, "*.xdat", SearchOption.TopDirectoryOnly));
+        string? previous = xdatFiles.SelectedItem as string;
+        xdatFiles.Items.Clear();
+        foreach (string path in xdatInputs) xdatFiles.Items.Add(Path.GetFileName(path));
+        if (previous is not null)
+        {
+            int index = xdatFiles.Items.IndexOf(previous);
+            if (index >= 0) xdatFiles.SelectedIndex = index;
+        }
+        if (xdatFiles.SelectedIndex < 0 && xdatFiles.Items.Count > 0) xdatFiles.SelectedIndex = 0;
+        SetXdatStatus($"{xdatInputs.Count} archivo(s) XDAT disponibles.");
+    }
+
+    private string? SelectedXdatPath()
+    {
+        int index = xdatFiles.SelectedIndex;
+        return index >= 0 && index < xdatInputs.Count ? xdatInputs[index] : null;
+    }
+
+    private async Task RunXdatDecompileAsync(Button decompileButton, Button compileButton)
+    {
+        string? source = SelectedXdatPath();
+        if (source is null || !File.Exists(source))
+        {
+            MessageBox.Show("Primero carga y selecciona un archivo .xdat.", "Methos XDAT",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-
-        if (!File.Exists(XdatExePath))
-        {
-            ShowXdatHostMessage("No se encontró el módulo XDAT.\nReinstala Methos para reparar sus componentes.");
-            return;
-        }
-
+        decompileButton.Enabled = compileButton.Enabled = false;
+        UseWaitCursor = true;
         try
         {
-            StopXdatProcess();
-            xdatProcess = Process.Start(new ProcessStartInfo
+            SetXdatStatus($"Descompilando {Path.GetFileName(source)}...");
+            LogXdat($"Iniciando descompilación: {Path.GetFileName(source)}");
+            var result = await Task.Run(() =>
             {
-                FileName = XdatExePath,
-                WorkingDirectory = Path.GetDirectoryName(XdatExePath)!,
-                UseShellExecute = false
+                ClearDirectoryContents(XdatPartsDir);
+                return XdatBridge.Decompile(source, XdatPartsDir);
             });
-            if (xdatProcess is null) throw new InvalidOperationException("Windows no pudo iniciar el módulo XDAT.");
-
-            IntPtr handle = IntPtr.Zero;
-            for (int attempt = 0; attempt < 150; attempt++)
-            {
-                xdatProcess.Refresh();
-                handle = xdatProcess.MainWindowHandle;
-                if (handle != IntPtr.Zero) break;
-                if (xdatProcess.HasExited) throw new InvalidOperationException("El módulo XDAT se cerró durante el inicio.");
-                await Task.Delay(100);
-            }
-            if (handle == IntPtr.Zero)
-                throw new TimeoutException("El módulo XDAT no creó una ventana visible en 15 segundos.");
-
-            xdatWindow = handle;
-            long style = GetWindowLongPtr(xdatWindow, GwlStyle).ToInt64();
-            style &= ~(WsPopup | WsCaption | WsThickFrame | WsBorder | WsSysMenu | WsMinimizeBox | WsMaximizeBox);
-            style |= WsChild | 0x10000000L;
-            SetWindowLongPtr(xdatWindow, GwlStyle, new IntPtr(style));
-            SetParent(xdatWindow, xdatHostPanel.Handle);
-            ResizeXdatWindow();
-            xdatHostPanel.Controls.Clear();
+            LogXdat($"Descompilación verificada: {result.Windows} ventanas y {result.Shortcuts} accesos directos.");
+            SetXdatStatus($"Descompilación terminada: {result.Windows} ventanas · {result.Shortcuts} accesos directos.");
+            MessageBox.Show($"Descompilación terminada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\n\nLos XML están en Compilados\\XDAT\\Decopilado.",
+                "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            StopXdatProcess();
-            ShowXdatHostMessage("No se pudo abrir el módulo XDAT.\n\n" + ex.Message);
-            Log("Error al iniciar el módulo XDAT: " + ex);
+            SetXdatStatus("Error al descompilar. El archivo original no se modificó.");
+            LogXdat("ERROR: " + ex);
+            MessageBox.Show(ex.GetBaseException().Message, "Error al descompilar XDAT",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+        finally { decompileButton.Enabled = compileButton.Enabled = true; UseWaitCursor = false; }
     }
 
-    private void ShowXdatHostMessage(string message)
+    private async Task RunXdatCompileAsync(Button decompileButton, Button compileButton)
     {
-        xdatHostPanel.Controls.Clear();
-        xdatHostPanel.Controls.Add(new Label
+        string? source = SelectedXdatPath();
+        if (source is null || !File.Exists(source))
         {
-            Text = message,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = Color.FromArgb(32, 48, 68)
-        });
-    }
+            MessageBox.Show("Selecciona el XDAT original que corresponde a los XML modificados.",
+                "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        int xmlCount = Directory.Exists(XdatPartsDir)
+            ? Directory.GetFiles(XdatPartsDir, "*.xml", SearchOption.AllDirectories).Length : 0;
+        if (xmlCount == 0)
+        {
+            MessageBox.Show("No hay XML en Compilados\\XDAT\\Decopilado. Primero descompila un XDAT.",
+                "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
 
-    private void ResizeXdatWindow()
-    {
-        if (xdatWindow == IntPtr.Zero || xdatHostPanel.IsDisposed) return;
-        MoveWindow(xdatWindow, 0, 0, Math.Max(1, xdatHostPanel.ClientSize.Width),
-            Math.Max(1, xdatHostPanel.ClientSize.Height), true);
-    }
-
-    private void StopXdatProcess()
-    {
-        xdatWindow = IntPtr.Zero;
+        string temporary = Path.Combine(XdatCompleteDir, "." + Path.GetFileName(source) + "." +
+            Guid.NewGuid().ToString("N") + ".tmp");
+        decompileButton.Enabled = compileButton.Enabled = false;
+        UseWaitCursor = true;
         try
         {
-            if (xdatProcess is { HasExited: false })
-            {
-                xdatProcess.CloseMainWindow();
-                if (!xdatProcess.WaitForExit(1500)) xdatProcess.Kill(entireProcessTree: true);
-            }
+            SetXdatStatus($"Compilando {xmlCount} archivos XML...");
+            LogXdat($"Compilando desde el contenido actual de Decopilado: {xmlCount} XML.");
+            var result = await Task.Run(() => XdatBridge.Compile(XdatPartsDir, source, temporary));
+            BackupXdatFile(source);
+            File.Move(temporary, source, overwrite: true);
+            RefreshXdatInputs();
+            int selected = xdatFiles.Items.IndexOf(Path.GetFileName(source));
+            if (selected >= 0) xdatFiles.SelectedIndex = selected;
+            LogXdat($"Compilación verificada: {result.Windows} ventanas, {result.Shortcuts} accesos directos, {result.Bytes:N0} bytes.");
+            SetXdatStatus($"Compilación terminada: {result.Bytes:N0} bytes. El original anterior quedó respaldado.");
+            MessageBox.Show($"Compilación terminada y validada.\n\nVentanas: {result.Windows}\nAccesos directos: {result.Shortcuts}\nTamaño: {result.Bytes:N0} bytes\n\nSe creó una copia de seguridad del archivo anterior. Los XML modificados se conservaron.",
+                "Methos XDAT", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-        catch { }
-        finally
+        catch (Exception ex)
         {
-            xdatProcess?.Dispose();
-            xdatProcess = null;
+            if (File.Exists(temporary)) File.Delete(temporary);
+            SetXdatStatus("Error al compilar. No se reemplazó el archivo original.");
+            LogXdat("ERROR: " + ex);
+            MessageBox.Show(ex.GetBaseException().Message, "Error al compilar XDAT",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+        finally { decompileButton.Enabled = compileButton.Enabled = true; UseWaitCursor = false; }
+    }
+
+    private static void BackupXdatFile(string path)
+    {
+        if (!File.Exists(path)) return;
+        string backupRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Methos", "Backups", "XDAT");
+        Directory.CreateDirectory(backupRoot);
+        string backup = Path.Combine(backupRoot,
+            Path.GetFileNameWithoutExtension(path) + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".xdat");
+        File.Copy(path, backup, overwrite: false);
+    }
+
+    private void LogXdat(string message)
+    {
+        if (xdatLog.InvokeRequired) { xdatLog.BeginInvoke(new Action<string>(LogXdat), message); return; }
+        xdatLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
+    }
+
+    private void SetXdatStatus(string message)
+    {
+        if (xdatStatus.InvokeRequired) { xdatStatus.BeginInvoke(new Action<string>(SetXdatStatus), message); return; }
+        xdatStatus.Text = message;
     }
 
     private void RefreshInputs()
