@@ -187,6 +187,27 @@ jobs:
           $xdatCommit = (git -C "$env:GITHUB_WORKSPACE\\xdat-source" rev-parse HEAD).Trim()
           Write-Host "Commit XDAT integrado en Methos: $xdatCommit"
 
+      - name: Instalar Python de prueba para validar el motor XDAT
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Extraer y preparar el código fuente XDAT
+        shell: pwsh
+        run: |
+          $xdatRepo = Join-Path $env:GITHUB_WORKSPACE "xdat-source"
+          $zip = Join-Path $xdatRepo "Methos_XDAT_Windows_Build_Kit_v1.0 (1).zip"
+          if (!(Test-Path $zip)) { throw "No se encontró el kit fuente XDAT." }
+          $extract = Join-Path $env:RUNNER_TEMP "methos-xdat-kit"
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+          $xdatProject = Get-ChildItem $extract -Directory | Select-Object -First 1
+          if (!$xdatProject) { throw "El kit XDAT no contiene la carpeta del proyecto." }
+          python "$xdatRepo\\apply_detection_layer.py" "$($xdatProject.FullName)"
+          if ($LASTEXITCODE -ne 0) { throw "Falló la capa de detección XDAT." }
+          python "$xdatRepo\\auto_pipeline_overlay.py" "$($xdatProject.FullName)"
+          if ($LASTEXITCODE -ne 0) { throw "Falló la integración del pipeline XDAT." }
+
       - name: Preparar runtime Python embebido para XDAT (sin segundo ejecutable)
         shell: pwsh
         run: |
