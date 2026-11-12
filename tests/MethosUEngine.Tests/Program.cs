@@ -131,7 +131,7 @@ static byte[] BuildFunctionFixture()
     return bytes;
 }
 
-if (args.Length >= 5 && args[0] == "--verify-verifyFunction-return")
+if (args.Length >= 5 && args[0] == "--verify-function-return")
 {
     string verifyPackagePath = args[1];
     string verifyClassName = args[2];
