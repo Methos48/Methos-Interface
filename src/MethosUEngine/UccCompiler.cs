@@ -57,9 +57,9 @@ public static class UccCompiler
         int depth = 0;
         bool inBlockComment = false;
 
-        foreach (string line in source.Replace("\\r\\n", "\\n").Replace('\\r', '\\n').Split('\\n'))
+        foreach (string line in source.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
-            if (Regex.IsMatch(line, @"^[\\t ]*(?:(?:simulated|static|final|native|iterator|latent)\\s+)*(?:function|event)\\b",
+            if (Regex.IsMatch(line, @"^[\t ]*(?:(?:simulated|static|final|native|iterator|latent)\s+)*(?:function|event)\b",
                     RegexOptions.IgnoreCase) && depth > 0)
             {
                 output.AppendLine(new string('}', depth));
@@ -71,7 +71,7 @@ public static class UccCompiler
             for (int i = 0; i < line.Length; i++)
             {
                 char ch = line[i];
-                char next = i + 1 < line.Length ? line[i + 1] : '\\0';
+                char next = i + 1 < line.Length ? line[i + 1] : '\0';
                 if (inBlockComment)
                 {
                     if (ch == '*' && next == '/') { inBlockComment = false; i++; }
@@ -79,7 +79,7 @@ public static class UccCompiler
                 }
                 if (!inString && ch == '/' && next == '/') break;
                 if (!inString && ch == '/' && next == '*') { inBlockComment = true; i++; continue; }
-                if (ch == '"' && (i == 0 || line[i - 1] != '\\\\')) { inString = !inString; continue; }
+                if (ch == '"' && (i == 0 || line[i - 1] != '\\')) { inString = !inString; continue; }
                 if (inString) continue;
                 if (ch == '{') depth++;
                 else if (ch == '}') depth = Math.Max(0, depth - 1);
