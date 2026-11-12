@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text.Json;
@@ -144,14 +145,19 @@ if (args.Length >= 5 && args[0] == "--verify-function-return")
     var verifyFunction = EnumerateClassFunctions(verifyClassObject)
         .Single(item => item.Name.ToString().Equals(verifyFunctionName, StringComparison.OrdinalIgnoreCase));
     var verifyPackageIndex = UnrealPackageIndex.Open(verifyPackagePath);
-    int verifyExportReference = (int)verifyFunction;
-    int verifyScriptOffset = checked((int)verifyFunction.ScriptOffset);
-    var verifyExport = verifyPackageIndex.Exports[verifyExportReference - 1];
-    string verifyCompiledBody = UnrealScriptFunctionDecompiler.DecompileExport(
-        verifyPackageIndex, verifyExportReference, verifyScriptOffset, verifyExport.SerialSize - verifyScriptOffset);
-    if (!verifyCompiledBody.Contains("return " + verifyExpectedReturn + ";", StringComparison.OrdinalIgnoreCase))
-        throw new Exception($"Compiled {verifyClassName}.{verifyFunctionName} did not contain expected return {verifyExpectedReturn}. Actual: {verifyCompiledBody}");
-    Console.WriteLine($"PASS: {verifyClassName}.{verifyFunctionName} was compiled with {verifyCompiledBody}");
+    string verifyDecompiledClass = verifyClassObject.Decompile();
+    string verifyFunctionPattern = @"(?is)function\\s+int\\s+" +
+        Regex.Escape(verifyFunctionName) +
+        @"\\s*\\([^)]*\\)\\s*\\{(?<body>.*?)\\}";
+    Match verifyFunctionMatch = Regex.Match(verifyDecompiledClass, verifyFunctionPattern);
+    if (!verifyFunctionMatch.Success)
+        throw new Exception($"UELib could not locate {verifyClassName}.{verifyFunctionName} in the compiled class source.");
+    string verifyCompiledBody = verifyFunctionMatch.Groups["body"].Value;
+    if (!Regex.IsMatch(verifyCompiledBody,
+        @"\\breturn\\s+" + Regex.Escape(verifyExpectedReturn) + @"\\s*;",
+        RegexOptions.IgnoreCase))
+        throw new Exception($"Compiled {verifyClassName}.{verifyFunctionName} did not contain expected return {verifyExpectedReturn}. Actual body: {verifyCompiledBody}");
+    Console.WriteLine($"PASS: {verifyClassName}.{verifyFunctionName} bytecode decompiles to return {verifyExpectedReturn}.");
     return;
 }
 
