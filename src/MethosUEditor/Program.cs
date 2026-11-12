@@ -126,11 +126,25 @@ internal sealed class MainForm : Form
         var top = new Panel { Dock = DockStyle.Top, Height = 96, Padding = new Padding(22, 14, 22, 12), BackColor = Color.FromArgb(15, 20, 31) };
         var title = new Label { Text = "METHOS", ForeColor = Color.White, Font = titleFont, AutoSize = true, Location = new Point(22, 10) };
         var subtitle = new Label { Text = "L2 INTERFACE EDITOR  •  LINEAGE II INTERLUDE", ForeColor = Color.FromArgb(165, 178, 199), Font = subFont, AutoSize = true, Location = new Point(25, 57) };
-        var homeButton = new Button { Text = "INICIO", Width = 92, Height = 38, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(35, 43, 59), ForeColor = Color.White, Font = new Font("Segoe UI", 9, FontStyle.Bold), Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(Width - 140, 28) };
+        var homeButton = new Button { Text = "INICIO", Width = 92, Height = 38, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(35, 43, 59), ForeColor = Color.White, Font = new Font("Segoe UI", 9, FontStyle.Bold), Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(Width - 176, 28) };
         homeButton.FlatAppearance.BorderColor = Color.FromArgb(76, 89, 111);
+        var brandMark = new Label
+        {
+            Name = "MethosRedMark",
+            Text = "M",
+            Width = 42,
+            Height = 48,
+            ForeColor = Color.FromArgb(235, 45, 58),
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 29, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Location = new Point(Width - 68, 20)
+        };
         top.Controls.Add(title);
         top.Controls.Add(subtitle);
         top.Controls.Add(homeButton);
+        top.Controls.Add(brandMark);
 
         homePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 14, 23), Padding = new Padding(24) };
         var intro = new Label { Text = "CENTRO DE HERRAMIENTAS", Dock = DockStyle.Top, Height = 58, ForeColor = Color.White, Font = new Font("Segoe UI", 15, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter };
