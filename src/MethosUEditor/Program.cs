@@ -472,30 +472,62 @@ internal sealed class MainForm : Form
         var baseName = Path.GetFileNameWithoutExtension(path);
         var output = Path.Combine(PartsDir, baseName);
         Log($"Analizando {Path.GetFileName(path)}...");
-        byte[] packageBytes = File.ReadAllBytes(path);
-        var detection = Lineage2FileDetector.Detect(packageBytes);
-        Log($"Detección U: estado={detection.Status}; familia={detection.Family}; versión={detection.Version?.ToString() ?? "(ninguna)"}.");
-        if (detection.Encrypted == true)
+        byte[] originalBytes = File.ReadAllBytes(path);
+        var inspection = ProtectionPipelinePlanner.InspectFullPipeline(originalBytes, path);
+        string family = inspection.Plan.Layers.Count == 0
+            ? "plain"
+            : string.Join(" + ", inspection.Plan.Layers.Select(layer => layer.Id));
+        int? protocol = inspection.SmartCryptProfile?.Lineage2Version;
+        if (!protocol.HasValue)
         {
-            string technical = $"INFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {packageBytes.Length:N0} bytes\nEstado: {detection.Status}\nVersión: {detection.Version}\nFamilia: {detection.Family}\nCabecera: {detection.Header ?? "(no identificada)"}\nPrimeros bytes (hex): {detection.FirstBytesHex}\nDiagnóstico: {detection.Detail}\n\nEl archivo original no fue modificado.";
-            string message = detection.DecoderAvailable
-                ? "Cifrado identificado, pero el motor de descifrado U todavía debe conectarse.\n\n" + technical
-                : "Cifrado reconocido, pero esta variante todavía no está soportada.\n\n" + technical;
-            MessageBox.Show(message, "Methos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            Log("Proceso detenido de forma segura: el archivo cifrado no se modificó.");
+            var protocolLayer = inspection.Plan.Layers.FirstOrDefault(layer => layer.Id.StartsWith("lineage2-", StringComparison.OrdinalIgnoreCase));
+            if (protocolLayer is not null && int.TryParse(protocolLayer.Id.Split('-').Last(), out int parsedProtocol))
+                protocol = parsedProtocol;
+        }
+        string? headerHex = inspection.SmartCryptProfile is not null
+            ? Convert.ToHexString(inspection.SmartCryptProfile.Marker)
+            : protocol.HasValue
+                ? Convert.ToHexString(Encoding.Unicode.GetBytes($"Lineage2Ver{protocol.Value:D3}"))
+                : null;
+
+        if (!inspection.IsPlaintextCandidate || !inspection.Plan.CanDecode ||
+            (inspection.Plan.Layers.Count > 0 && !inspection.Plan.CanEncode))
+        {
+            string details = $"INFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {originalBytes.Length:N0} bytes\nEstado: {inspection.Plan.Status}\nCapas: {family}\nDiagnóstico: {inspection.Plan.Explanation}\n\nEl archivo original permanece intacto. Methos no continuará si no puede reconstruir todas las capas detectadas.";
+            MessageBox.Show(details, "Methos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Log("Proceso detenido de forma segura: faltan capas o perfiles verificables.");
             return;
         }
-        if (detection.Status != "plain_candidate")
+
+        byte[] packageBytes;
+        string packageLoadPath = path;
+        string? decodedTempPath = null;
+        if (inspection.Plan.Layers.Count == 0)
         {
-            string technical = $"No se reconoce este cifrado.\n\nINFORMACIÓN TÉCNICA\nArchivo: {Path.GetFileName(path)}\nTamaño: {packageBytes.Length:N0} bytes\nEstado: {detection.Status}\nPrimeros bytes (hex): {detection.FirstBytesHex}\nDiagnóstico: {detection.Detail}\n\nEl archivo original no fue modificado.";
-            MessageBox.Show(technical, "Methos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            packageBytes = originalBytes;
         }
+        else
+        {
+            var protectionRuntime = ProtectionCodecRuntime.CreateDefault(
+                smartCryptProfile: inspection.SmartCryptProfile,
+                lineage2CustomTailProfile: inspection.Lineage2CustomTailProfile);
+            packageBytes = protectionRuntime.Decode(inspection.Plan, originalBytes, Path.GetFileName(path));
+            byte[] reconstructedOriginal = protectionRuntime.Encode(inspection.Plan, packageBytes, Path.GetFileName(path));
+            if (!reconstructedOriginal.AsSpan().SequenceEqual(originalBytes))
+                throw new InvalidDataException("La verificación completa de las capas no reconstruyó el original byte por byte.");
+            decodedTempPath = Path.Combine(Path.GetTempPath(), "MethosDecoded_" + Guid.NewGuid().ToString("N") + ".u");
+            File.WriteAllBytes(decodedTempPath, packageBytes);
+            packageLoadPath = decodedTempPath;
+        }
+
+        Log($"Capas detectadas: {family}; estado={inspection.Plan.Status}; bytes descifrados={packageBytes.Length:N0}.");
+        try
+        {
         Directory.CreateDirectory(output);
         Log($"Descompilando {Path.GetFileName(path)}...");
         try
         {
-            var index = UnrealPackageIndex.Open(path);
+            var index = UnrealPackageIndex.Parse(packageBytes);
             Log($"Índice independiente UE2: {index.Summary.ProfileDescription}; nombres={index.Summary.NameCount}, imports={index.Summary.ImportCount}, exports={index.Summary.ExportCount}, generaciones={index.Summary.GenerationCount}.");
         }
         catch (Exception ex)
@@ -506,10 +538,10 @@ internal sealed class MainForm : Form
         if (TryRestoreExactSources(baseName, packageBytes, output))
         {
             string restoredMetadata = PackageOriginMetadata.Save(
-                path, packageBytes, output, "UnrealPackage",
-                detection.Status.ToString(), detection.Family, detection.Version,
-                detection.Header, detection.Detail);
-            Log($"Perfil de origen guardado: {restoredMetadata}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
+                path, originalBytes, output, "UnrealPackage",
+                inspection.Plan.Status, family, protocol,
+                headerHex, inspection.Plan.Explanation, protection: inspection);
+            Log($"Perfil de origen guardado: {restoredMetadata}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(originalBytes))}.");
             return;
         }
 
@@ -517,7 +549,7 @@ internal sealed class MainForm : Form
         try { nativeIndex = UnrealPackageIndex.Parse(packageBytes); }
         catch (Exception ex) { Log($"Aviso: descompilador nativo no disponible para este paquete: {ex.Message}"); }
 
-        using var package = UnrealLoader.LoadPackage(path, FileAccess.Read);
+        using var package = UnrealLoader.LoadPackage(packageLoadPath, FileAccess.Read);
         Log($"Paquete detectado: versión {package.Summary.Version}, licencia {package.Summary.LicenseeVersion}.");
         package.InitializePackage();
         var classes = package.Objects.OfType<UClass>().Where(o => (int)o > 0).ToList();
@@ -634,10 +666,10 @@ internal sealed class MainForm : Form
         Log($"Descompilación terminada. Clases exportadas: {ok}; errores: {failed}; funciones reparadas: {repairedFunctions}; llaves insertadas: {insertedClosures}; cierres sobrantes eliminados: {removedClosures}; funciones descompiladas/verificadas por Methos: {nativeFunctions}. Carpeta: {output}");
         if (ok == 0) throw new InvalidOperationException("No se pudo exportar ninguna clase. El paquete puede usar una variante de Unreal/Lineage que requiere ajustes de compatibilidad.");
         string metadataPath = PackageOriginMetadata.Save(
-            path, packageBytes, output, "UnrealPackage",
-            detection.Status.ToString(), detection.Family, detection.Version,
-            detection.Header, detection.Detail, checked((int)package.Summary.Version),
-            checked((int)package.Summary.LicenseeVersion));
+            path, originalBytes, output, "UnrealPackage",
+            inspection.Plan.Status, family, protocol,
+            headerHex, inspection.Plan.Explanation, checked((int)package.Summary.Version),
+            checked((int)package.Summary.LicenseeVersion), inspection);
         Log($"Perfil de origen guardado: {metadataPath}; SHA-256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packageBytes))}.");
     });
 
@@ -682,7 +714,13 @@ internal sealed class MainForm : Form
                             if (string.Equals(packageIndex.Names[i], name, StringComparison.OrdinalIgnoreCase))
                                 return i;
                         throw new InvalidDataException($"La constante Name '{name}' no existe en la tabla del paquete.");
-                    });
+                        }
+        finally
+        {
+            if (decodedTempPath is not null && File.Exists(decodedTempPath))
+                File.Delete(decodedTempPath);
+        }
+    });
 
                 // Only replace the source text when the native compiler recreates the exact original bytecode.
                 // This makes the native decompiler a verified round-trip, not a guess based on formatting.
