@@ -55,7 +55,7 @@ public static class UnrealScriptFunctionDecompiler
         }
 
         if (ReadByte(bytecode, ref position) != EX_EndOfScript)
-            throw new NotSupportedException("La función contiene instrucciones adicionales fuera del subconjunto de descompilación actual.");
+            throw new NotSupportedException($"La función contiene instrucciones adicionales fuera del subconjunto de descompilación actual. Posición={position - 1}; bytes={Convert.ToHexString(bytecode.AsSpan(position - 1, Math.Min(32, bytecode.Length - (position - 1))))}.");
         consumedBytes = position;
         return result;
     }
