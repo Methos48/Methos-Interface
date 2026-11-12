@@ -1098,10 +1098,13 @@ internal sealed class MainForm : Form
                 Log($"Verificación final: {classCount} clases; names={verified.Names.Count}, imports={verified.Imports.Count}, exports={verified.Exports.Count}.");
             }
 
+            byte[] finalBytes = EncodeCompiledPackage(
+                packageBytes, protectionInspection, protectionRuntime, originalFileName);
+            File.WriteAllBytes(temporaryOutput, finalBytes);
             var destination = Path.Combine(CompleteDir, baseName + ".u");
             SaveSourceSnapshot(baseName, packageBytes, sourceDirectory);
             CopyWithBackup(temporaryOutput, destination);
-            Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}. Archivo: {destination}");
+            Log($"Compilación nativa terminada: clases={classesProcessed}; funciones={functionsCompiled}; funciones reparadas={repairedFunctions}; llaves insertadas={insertedClosures}; bytes={finalBytes.Length:N0}. Archivo: {destination}");
         }
         finally
         {
