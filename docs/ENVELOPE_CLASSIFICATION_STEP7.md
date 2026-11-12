@@ -31,3 +31,32 @@ The native `FL2DESCodec` implementation is confirmed in the uploaded `l2.exe`, b
 4. Only then implement decode/encode and require a byte-identical no-edit round trip.
 
 No original binary was modified. No decryption success is claimed.
+
+
+## Step 8 — external LameCrypt cross-check
+
+Date: 2026-11-11
+
+A source-level cross-check was performed against the open-source acmi/L2crypt implementation (L2Crypt.java and lame/LameCrypt.java).
+
+Confirmed behavior in that implementation:
+- LameCrypt variants are still wrapped in a 28-byte UTF-16LE Lineage2Ver### header.
+- Recognized LameCrypt version numbers include 811/821 (XOR family), 820 (120 family), 911/912 (Blowfish family), and 611–614 (RSA family).
+- The LameCrypt layer XORs subsequent bytes with a repeating fixed error-message string, then delegates to the corresponding standard Lineage2 codec.
+
+Consequence for our exact samples:
+- Their first six bytes are FF ED FA CE 01 00, not the beginning of the required UTF-16LE Lineage2Ver header.
+- Therefore these samples do not match the documented acmi/L2crypt LameCrypt envelope as-is. This rules out that specific public implementation as the direct explanation; it does not rule out a different/private/custom fork or an additional outer wrapper.
+
+SmartCrypt remains a candidate because its vendor describes a custom-key protection product supporting .u and .xdat, but there is no sample-level proof connecting SmartCrypt to these files. No SmartCrypt key, algorithm, or decryption path has been identified.
+
+Sources:
+- https://github.com/acmi/L2crypt/blob/master/src/main/java/acmi/l2/clientmod/crypt/L2Crypt.java
+- https://github.com/acmi/L2crypt/blob/master/src/main/java/acmi/l2/clientmod/crypt/lame/LameCrypt.java
+- https://smart-guard.eu/en/smartcrypt
+
+## Updated status
+
+Known public LameCrypt format: checked and incompatible with the observed leading bytes.
+SmartCrypt/private custom protector: still unconfirmed.
+Exact producer/tool and cipher for the uploaded samples: not identified.
