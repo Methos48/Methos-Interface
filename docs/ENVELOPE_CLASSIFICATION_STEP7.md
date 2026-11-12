@@ -344,3 +344,35 @@ Source:
 
 Status:
 This is a new compatibility lead only. Neither the 2025 source nor the exact user's U/XDAT outputs have been executed or validated. No decryption success is claimed.
+
+
+## Step 18 — independent ActiveAntiCheatCrypt implementation cross-check
+
+Date: 2026-11-12
+
+Inspected the public GitHub project https://github.com/kerogenesis/ActiveAnticheatDecoder (Rust, Windows x86; README and source modules). This is a separate, independently implemented decoder for ActiveAntiCheatCrypt and clarifies what the 2025 SmartDecrypt update likely refers to.
+
+Verified from its source:
+- AAC files have an explicit 20-byte ASCII magic: `ActiveAnticheatCrypt`.
+- The parser expects a 256-byte RSA block at offset 0x14 and encrypted payload beginning at 0x114.
+- It decrypts the RSA block with a private RSA profile, validates PKCS#1 v1.5 type-2 padding, extracts a 20-byte RC4 key (or a 40-byte message containing the magic plus key), removes the 0x114-byte wrapper, and RC4-decrypts the payload.
+- Its key is captured from the client process at runtime through a proxy DLL / named pipe, then cached. The tool is not a universal offline decoder without the matching RSA private components.
+- It optionally changes a GamekitData header to Lineage2Ver for a specific Scryde integration; this is not a generic SmartCrypt stage.
+
+Critical comparison with the user's supplied samples:
+- The recorded first six bytes of both user's files are `FF ED FA CE 01 00`, not the AAC ASCII magic. Therefore the known AAC container format from this independent implementation does not directly match the raw user samples.
+- This does not exclude an AAC layer being exposed only after a prior SmartCrypt extraction, but there is no evidence yet that it is present in these exact samples.
+- The August 2025 forum post says the revised SmartDecrypt source works with Active Anti Cheat Crypt, but the linked Pastebin code remains inaccessible to this inspection. The forum statement alone does not establish how it handles AAC or prove that the user's files need that stage.
+
+Consequences for Methos:
+1. Keep SmartCrypt capture and AAC decoding as separate, optional stages; do not merge their algorithms or label the user's current files AAC.
+2. Add an AAC signature detector only as a future format-detection branch after an actual capture result exists.
+3. If a post-SmartCrypt output begins with `ActiveAnticheatCrypt`, the public AAC decoder's documented structure/key-capture method is a concrete research lead. If it does not, do not run that decoder.
+4. The public AAC project is useful as a reference implementation, not evidence that the user's U/XDAT have been decrypted.
+
+Sources:
+- https://github.com/kerogenesis/ActiveAnticheatDecoder (README, Cargo.toml, src/format/aac.rs, src/format/pipeline.rs, src/capture/live.rs)
+- https://maxcheaters.com/topic/249577-smart-crypt-decryptor-1522/ (2025-08-16 author update)
+
+Status:
+This is a source-level format cross-check only. The user's exact U/XDAT samples have not been captured, decrypted, or validated. No decryption success is claimed.
