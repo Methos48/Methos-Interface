@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace MethosUEngine;
@@ -17,6 +18,15 @@ public sealed record UccCompileResult(
 /// </summary>
 public static class UccCompiler
 {
+    // UELib can emit these two bytecode tokens as control characters in function identifiers.
+    // Rename each token consistently in staged copies only; never alter the user's extracted sources.
+    private static readonly IReadOnlyDictionary<char, string> RecoveredIdentifiers =
+        new Dictionary<char, string>
+        {
+            ['\u0011'] = "MethosRecoveredFunction_17",
+            ['\u001D'] = "MethosRecoveredFunction_29"
+        };
+
     public static bool IsAvailable(string runtimeRoot)
     {
         string system = Path.Combine(runtimeRoot, "Interlude", "System");
@@ -67,8 +77,21 @@ public static class UccCompiler
             foreach (string file in Directory.GetFiles(sourceSystem))
                 File.Copy(file, Path.Combine(stagedSystem, Path.GetFileName(file)), overwrite: true);
 
+            int repairedIdentifiers = 0;
             foreach (string file in sourceFiles)
-                File.Copy(file, Path.Combine(stagedClasses, Path.GetFileName(file)), overwrite: true);
+            {
+                string source = File.ReadAllText(file, Encoding.Default);
+                foreach (var pair in RecoveredIdentifiers)
+                {
+                    int count = source.Count(ch => ch == pair.Key);
+                    if (count > 0)
+                    {
+                        source = source.Replace(pair.Key.ToString(), pair.Value);
+                        repairedIdentifiers += count;
+                    }
+                }
+                File.WriteAllText(Path.Combine(stagedClasses, Path.GetFileName(file)), source, new UTF8Encoding(false));
+            }
 
             string compilerPath = Path.Combine(stagedSystem, "ucc.exe");
             var startInfo = new ProcessStartInfo
@@ -102,6 +125,7 @@ public static class UccCompiler
             Task.WaitAll(standardOutput, standardError);
 
             string compilerOutput = standardOutput.Result + Environment.NewLine + standardError.Result;
+            compilerOutput += Environment.NewLine + $"METHOS_SOURCE_REPAIRS={repairedIdentifiers}";
             if (process.ExitCode != 0 ||
                 !Regex.IsMatch(compilerOutput, @"Success\s*-\s*0 error\(s\)", RegexOptions.IgnoreCase))
             {
